@@ -25,3 +25,6 @@ pyyaml
 
 jupyter 
 ipykernel
+
+panda-gym 
+stable-baselines3[extra]
