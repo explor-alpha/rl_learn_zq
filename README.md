@@ -52,5 +52,9 @@ python -c "import torch; print(torch.__version__); print(torch.backends.mps.is_a
 ```
 
 ```
+conda install -c conda-forge pybullet
+```
+
+```
 pip install -r requirements.txt
 ```
