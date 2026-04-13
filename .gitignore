@@ -11,3 +11,11 @@ build/
 .env
 
 .vscode/  
+
+# 忽略所有层级下的 __pycache__ 文件夹
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# 如果你用 Jupyter Notebook，也建议忽略这个
+.ipynb_checkpoints/
