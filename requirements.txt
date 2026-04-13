@@ -4,15 +4,6 @@
 # Macbook M5
 # pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
 
-# 物理引擎 &接口
-gymnasium[mujoco,classic-control]
-
-# baseline对比实验
-stable-baselines3
-
-# record
-tensorboard
-
 # 基础工具
 numpy
 scipy
@@ -26,5 +17,14 @@ pyyaml
 jupyter 
 ipykernel
 
+# record
+tensorboard
+
+# 物理引擎 &接口
+gymnasium[mujoco,classic-control]
+gymnasium[other]
 panda-gym 
+
+# 标准化实现
+stable-baselines3
 stable-baselines3[extra]
