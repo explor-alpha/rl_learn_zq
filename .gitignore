@@ -1,21 +1,33 @@
-# Mac 系统文件
-.DS_Store
-__MACOSX
+# .gitignore
 
-# 常用缓存/依赖
+
+# --- Python 垃圾 ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.conda/
+# 忽略打包产生的信息
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+
+# 常用缓存/临时文件
 node_modules/
 dist/
 build/
 *.log
 *.tmp
-.env
 
-.vscode/  
+# --- 操作系统/IDE 垃圾 ---
+.DS_Store
+__MACOSX
+Thumbs.db
+.vscode/
+.idea/
+*.swp
 
-# 忽略所有层级下的 __pycache__ 文件夹
-**/__pycache__/
-*.py[cod]
-*$py.class
-
-# 如果你用 Jupyter Notebook，也建议忽略这个
-.ipynb_checkpoints/
+# 锁定 .gitattributes 不被忽略
+!.gitattributes

@@ -1,0 +1,33 @@
+# .gitattributes
+
+
+# 所有文件默认自动识别，如果是文本，入库和检出都强制转为 LF。
+* text=auto eol=lf
+
+# 显式标注这些文件可以防止 Git 误判。保持 LF。
+*.py text
+*.c text
+*.cpp text
+*.h text
+*.sh text
+*.txt text
+*.md text
+*.json text
+*.yaml text
+*.yml text
+
+# 唯独 Windows 的脚本保持 CRLF
+# 如果你偶尔需要写 Windows 批处理，它们必须保持 CRLF，否则 Win 下运行会乱码。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 告诉 Git 这些是二进制文件，绝对不要改动里面的任何字节！
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.exe binary
+*.zip binary
+*.tar.gz binary

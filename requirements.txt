@@ -1,30 +1,26 @@
-# 避免--index-url指令冲突。不在requirements中安装
-# Windows + RTX 5060Ti (sm_120)：CUDA 12.8 | torch 2.7.0
-# pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128
-# Macbook M5
-# pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
+# requirements.txt
 
-# 基础工具
-numpy
-scipy
-matplotlib
-pillow
 
-tqdm
-psutil
-pyyaml
+# --- 基础工具 (使用 >= 保证跨平台兼容性) ---
+numpy>=2.0.0
+scipy>=1.15.3
+matplotlib>=3.10.8
+pillow>=11.3.0
+tqdm>=4.67.3
+psutil>=7.2.2
+pyyaml>=6.0.3
+setuptools>=69.5.1
 
-jupyter 
-ipykernel
+# --- 开发与记录工具 ---
+jupyter>=1.1.1
+ipykernel>=7.2.0
+tensorboard>=2.20.0
 
-# record
-tensorboard
+# --- 物理引擎与环境 (严格对齐版本，保证仿真一致性) ---
+# 包含 mujoco 3.6.0 接口
+gymnasium[mujoco,classic-control,other]==1.2.3
+panda-gym==3.0.7
 
-# 物理引擎 &接口
-gymnasium[mujoco,classic-control]
-gymnasium[other]
-panda-gym 
-
-# 标准化实现
-stable-baselines3
-stable-baselines3[extra]
+# --- 算法标准化实现 (核心逻辑，必须严格对齐) ---
+# 该版本支持最新的 gymnasium 和 torch
+stable-baselines3[extra]==2.8.0
