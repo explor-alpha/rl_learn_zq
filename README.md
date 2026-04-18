@@ -91,7 +91,6 @@ pip install -r requirements.txt
 ``` zsh
 # 示例
 conda activate rl_learn
-cd projects_mac/own/rl_learn_zq/
 tensorboard --logdir=Task2_sb3_sop/outputs/
 ```
 

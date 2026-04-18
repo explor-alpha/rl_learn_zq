@@ -10,7 +10,8 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 # 获取当前脚本所在的文件夹
 CURRENT_DIR = pathlib.Path(__file__).parent.resolve()
 # 向上寻找 logs 文件夹（假设 logs 在脚本同级或上一级）
-LOG_DIR = CURRENT_DIR / "logs" / "sac_panda_reach"
+# LOG_DIR = CURRENT_DIR / "logs" / "sac_panda_reach"
+LOG_DIR = CURRENT_DIR / "outputs" / "experiment_0F" / "SAC_run_01_random_baseline" / "models"
 
 # 尝试寻找模型文件（去掉 .zip 后缀，让 SB3 自己处理）
 MODEL_PATH = str(LOG_DIR / "best_model") 
