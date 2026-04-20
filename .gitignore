@@ -1,6 +1,8 @@
 # .gitignore
 
 
+*.refer/
+
 # --- Python 垃圾 ---
 __pycache__/
 *.py[cod]
