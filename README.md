@@ -54,10 +54,9 @@ conda create -n rl_learn python=3.10
 conda activate rl_learn
 
 pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
-conda install -c conda-forge pybullet
 pip install -r requirements.txt
 
-# mac 上 setuptools默认版本和 tensorboard 不适配，手动降版本
+# mac 上 setuptools默认版本可能和 tensorboard 不适配，手动降版本
 pip install "setuptools<70"
 ```
 
@@ -81,17 +80,21 @@ conda activate rl_learn
 # Windows + RTX 5060Ti (sm_120)：CUDA 12.8 | torch 2.7.0
 # 避免--index-url指令冲突。不在requirements中安装
 pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements.txt
+```
 
+> PS:Task2
+```
 # pip 不好装 pybullet，用 conda
 conda install -c conda-forge pybullet
-pip install -r requirements.txt
 ```
 
 ### Tensorboard
 ``` zsh
 # 示例
+cd projects_mac/own/rl_learn_zq_native/
 conda activate rl_learn
-tensorboard --logdir=Task2_sb3_sop/outputs/
+tensorboard --logdir=Task3_manipulator_bring_ball/outputs/
 ```
 
 

@@ -1,11 +1,13 @@
-# mjpython Task3/o6_urdf/test_visualize.py 
-
+import os
+import time
 import mujoco
 import mujoco.viewer
 import numpy as np
-import time
 
-model = mujoco.MjModel.from_xml_path('Task3/o6_urdf/linkerhand_o6_right.urdf')
+current_dir = os.path.dirname(os.path.abspath(__file__))
+urdf_path = os.path.join(current_dir, "linkerhand_o6_right.urdf")
+
+model = mujoco.MjModel.from_xml_path(urdf_path)
 data = mujoco.MjData(model)
 
 # 映射表中的 6 个主关节 ID
