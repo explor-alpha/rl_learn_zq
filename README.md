@@ -1,11 +1,5 @@
 ### 项目目标
 
-本项目最终要解决的问题是控制灵巧手抓取物体：
-- observe：2 个相机
-- action：6 个关节的目标位置，力矩，速度
-- Assumption：加速度很慢，认为匀速
-- Target：抓取乒乓球
-
 为了实现这个目标，将其分解成一下几个 Tasks 逐步完成
 
 **Task1**：  
@@ -17,32 +11,35 @@
 - 问题的定义：调用标准库 SB3 ，解决稍微困难些的问题 PandaReach-v3
 - 目标：  
 1. 尝试调用 SB3 ，了解其功能   
-2. 尝试调用 SB3 处理一个未知环境（例如 PandaReach-v3），并了解 SOP 流程 。如何探索环境？如何调用 SB3 选择算法？如何逐步调试到最终落实？等等  
 
+**Task3【Doing】**：  
+- 假设给定一个定义好的环境（DeepMind Control Suite 中的 Manipulator 经典任务：平面机械手抓球），已知 xml  
+- 探索基于 mojoco+SB3 的 RL 任务训练流程：尝试自定义环境（observation，reward等等逻辑），自定义训练脚本（调用 SB3；课程学习；Callback-tensorboard等等逻辑）  
+- 添加可变动高度的隔板，感受课程学习的能力  
+
+**Task4【TODO】**:  
+- 基于Linkerhand O6 视觉动力学的研究  
 
 ### 项目文件结构
 
-```数据驱动的智能控制 - 大作业
-23122932  
- ┣ notebooks  
- ┃ ┣ CartPole.ipynb  # 执行脚本（CartPole环境）
- ┃ ┗ Pendulum.ipynb  # 执行脚本（Pendulum环境）
- ┣ src  
- ┃ ┣ agents  
- ┃ ┃ ┣ myActorCritic.py  
- ┃ ┃ ┣ myDQN.py  
- ┃ ┃ ┣ myPPO.py  
- ┃ ┃ ┣ myPPOcontinuous.py  
- ┃ ┃ ┣ mySAC.py  
- ┃ ┃ ┣ mySACcontinuous.py  
- ┃ ┃ ┣ myTRPO.py  
- ┃ ┃ ┗ myTRPOcontinuous.py  
- ┃ ┣ utils  
- ┃ ┃ ┣ rl_Actor_nets.py  
- ┃ ┃ ┣ rl_Critic_nets.py  
- ┃ ┃ ┗ rl_utils.py  
- ┣ README.md  
- ┗ requirements.txt
+```
+rl_learn_zq_native/
+├── src/                        # 手写强化学习算法库（主要逻辑参考“动手学强化学习”）
+│   ├── agents/                 # PPO, SAC, DQN, TRPO 等算法的 Native 实现
+│   └── utils/                  # 神经网络(Actor/Critic)构筑与 RL 工具函数
+├── Task1_myAlgo/               # Task1：在经典环境(CartPole/Pendulum)验证手写算法
+├── Task2_sb3_sop/              # Task2：尝试使用 Stable Baselines3 框架
+│   ├── outputs/                
+│   └── PandaReach.ipynb        # 基于 Panda 机械臂的达标任务实验
+├── Task3_manipulator_bring_ball/ # Task3: 自定义 Mujoco 机械臂抓球任务 [Doing]
+│   ├── xml/                    # 仿真场景建模 xml（copy from MotrixLab）
+│   ├── config.py               # 自定义config
+│   ├── env.py                  # 自定义仿真环境封装接口
+│   └── train.py                # 自定义的训练脚本
+├── Task4_mylinker/             # Task4: Linkerhand O6 视觉动力学 [TODO]
+│   └── xml/meshes/             # 初步转化好了 xml，并通过 mujoco 可视化 [debug]
+├── requirements.txt            
+└── README.md      
 ```
 
 参照 Google Python Style Guide（⾕歌注释规范） 编写注释
