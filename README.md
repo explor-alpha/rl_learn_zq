@@ -50,13 +50,13 @@
 ### 环境配置
 #### Macbook M5环境配置（**Native**）
 ```zsh
-conda create -n rl_learn python=3.10
+conda create -n rl_learn python=3.10 -y
 conda activate rl_learn
 
 pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
 pip install -r requirements.txt
 
-# mac 上 setuptools默认版本可能和 tensorboard 不适配，手动降版本
+# setuptools默认版本可能和 tensorboard 不适配，手动降版本
 pip install "setuptools<70"
 ```
 
@@ -64,27 +64,22 @@ pip install "setuptools<70"
 # 验证 mps
 export KMP_DUPLICATE_LIB_OK=TRUE
 python -c "import torch; print(torch.__version__); print(torch.backends.mps.is_available())"
-```
+``` 
 
+#### 其他
 ```zsh
 # (可选) Mac 录制视屏
 brew install ffmpeg
 ```
 
-#### Windows + RTX 5060Ti (sm_120)环境配置
-> Windows + RTX 5060Ti (sm_120)：选择CUDA 12.8 | torch 2.7.0
-```
-conda create -n rl_learn python=3.10
-conda activate rl_learn
-
-# Windows + RTX 5060Ti (sm_120)：CUDA 12.8 | torch 2.7.0
+```bash
+# WSL/Windows + RTX 5060Ti (sm_120)：CUDA 12.8 | torch 2.7.0
 # 避免--index-url指令冲突。不在requirements中安装
 pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128
-pip install -r requirements.txt
 ```
 
-> PS:Task2
-```
+> PS:Task2 需额外安装 pybullet
+```bash
 # pip 不好装 pybullet，用 conda
 conda install -c conda-forge pybullet
 ```

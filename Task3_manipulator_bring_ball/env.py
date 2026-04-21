@@ -9,6 +9,9 @@ class PlanarBringBallEnv(gym.Env):
         self.model = mujoco.MjModel.from_xml_path(model_path)
         self.data = mujoco.MjData(self.model)
         
+        self.max_steps = 1000  # 最大步数限制
+        self.current_step = 0
+
         # 动作空间: 5个电机 (root, shoulder, elbow, wrist, grasp)
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(5,), dtype=np.float32)
         
@@ -54,7 +57,11 @@ class PlanarBringBallEnv(gym.Env):
             dist_to_gate = np.linalg.norm(self.data.site_xpos[self.pinch_id] - [0.2, 0, self.wall_height+0.1])
             reward -= dist_to_gate
 
-        return obs, reward, False, False, {}
+        self.current_step += 1
+        terminated = False
+        truncated = self.current_step >= self.max_steps
+
+        return obs, reward, terminated, truncated, {}
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)

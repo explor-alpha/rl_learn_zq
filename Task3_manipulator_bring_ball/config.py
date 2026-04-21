@@ -5,14 +5,14 @@ from typing import List, Dict
 @dataclass
 class TrainConfig:
     # --- 实验元信息 ---
-    exp_name: str = "exp-01_PPO_random"
+    exp_name: str = "exp-00_PPO_debug_test011"
     # 获取当前文件所在目录作为 task_dir
     task_dir: str = os.path.dirname(os.path.abspath(__file__))
     
     # --- 基础 PPO 参数 ---
-    total_timesteps: int = 500000
+    total_timesteps: int = 512000  # 500000
     learning_rate: float = 3e-4
-    n_steps: int = 2048
+    n_steps: int = 2048   # 2048
     batch_size: int = 64
     gamma: float = 0.99
     
