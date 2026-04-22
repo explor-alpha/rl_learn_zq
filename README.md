@@ -90,5 +90,19 @@ tensorboard --logdir=Task3_manipulator_bring_ball/outputs/
 ```
 
 
+### show
+```zsh
+# 1. 实时预览当前的“最优模型” (默认无墙)
+mjpython Task3_manipulator_bring_ball/show.py --mode human
 
+# 2. 测试模型在“高墙”下的通过能力
+mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.3
+
+# 3. 指定球和目标的位置进行特定场景测试
+# 将球放在 x=0.4, z=0.2 的位置，目标放在 x=-0.3, z=0.4 的位置
+mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.1 --ball 0.4 0.2 --target -0.3 0.4
+
+# 4. 录制一段带墙视频并保存
+mjpython Task3_manipulator_bring_ball/show.py --mode video --wall 0.2 --steps 1000
+```
 
