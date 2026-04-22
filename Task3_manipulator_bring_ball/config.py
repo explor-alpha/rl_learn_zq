@@ -6,13 +6,25 @@ from typing import List, Dict
 class TrainConfig:
     # --- 实验元信息 ---
     exp_name: str = "exp-00_PPO_debug_test011"
-    # 获取当前文件所在目录作为 task_dir
     task_dir: str = os.path.dirname(os.path.abspath(__file__))
     
+    # --- 基础 步长相关 参数 ---
+    episode_max_steps: int = 1000  # env.py，单个 episode 最大步数, 之后 truncated
+    n_steps: int = 2048   # train.py, 2048 步数后进行一次梯度回传更新参数
+    eval_freq_steps: int = 2048*4  # train.py，n_steps*4 调用 hook 评估训练效果
+    total_timesteps: int = 512000  # train.py，learn，total_timesteps后评估一次课程训练效果，判断是否进入下一课程或终止
+
+    # --- reward 相关参数 ---
+    # 成功终止条件
+    success_threshold=0.05
+    # 奖励权重
+    reward_weight_hand_to_ball = 1.0  
+    reward_weight_ball_to_target = 1.0
+    reward_weight_gate = 1.0
+    reward_success = 10.0
+
     # --- 基础 PPO 参数 ---
-    total_timesteps: int = 512000  # 500000
     learning_rate: float = 3e-4
-    n_steps: int = 2048   # 2048
     batch_size: int = 64
     gamma: float = 0.99
     

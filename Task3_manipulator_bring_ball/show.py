@@ -93,6 +93,7 @@ def main():
             else:
                 # 录制模式：手动提取帧
                 # venv.render() 在 rgb_array 模式下返回的是包含 1 个数组的 list
+                # 调用env.render() ，刷帧
                 frame = env.render() 
                 if isinstance(frame, list):
                     frames.append(frame[0])

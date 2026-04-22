@@ -205,7 +205,7 @@ def train():
         eval_env, 
         best_model_save_path=best_model_path,
         log_path=output_dir, 
-        eval_freq=cfg.n_steps*4, # 每四轮梯度回传参数更新评估一次
+        eval_freq=cfg.eval_freq_steps, # 每四轮梯度回传参数更新评估一次
         deterministic=True, 
         render=False,
         callback_on_new_best=save_vec_callback, # 发现新高时触发 pkl 保存

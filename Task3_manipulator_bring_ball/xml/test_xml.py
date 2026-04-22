@@ -1,3 +1,5 @@
+# mjpython Task3_manipulator_bring_ball/xml/test_xml.py  
+
 import mujoco
 import mujoco.viewer
 import time
