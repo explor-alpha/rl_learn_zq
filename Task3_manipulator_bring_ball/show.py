@@ -33,7 +33,7 @@ def get_args():
     - tx (随机): [-0.3, -0.2] (位于墙左侧)
     - tz (随机): [0.05, 0.50] (悬浮或贴地)
     --------------------------------------------------
-    调用示例:
+    调用示例: 
     mjpython Task3_manipulator_bring_ball/show.py --help
     mjpython Task3_manipulator_bring_ball/show.py --mode human
     mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.20 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "exp-00_PPO_debug_test011"
