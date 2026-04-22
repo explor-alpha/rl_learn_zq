@@ -1,10 +1,17 @@
 """
-自定义环境 env.py
+env.py: 自定义环境 
     对应任务: 平面机械手抓球——DeepMind Control Suite 中的 Manipulator 经典任务
     对应 MuJoCo 的模型实例: "manipulator_bring_ball.xml" 
         原始xml来源(略微修改): https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml
         "manipulator_bring_ball.xml"可通过 test_xml.py 展示
 
+    环境支持功能：
+    1. 实验-不同奖励设计+权重；
+    2. 实验-课程学习（通过调整墙的高度）。
+    3. 可视化-通过 show.py 可视化训练结果; 录制视频; 
+    4. reset 逻辑: train 阶段随机初始化球和 target的位置(x, z); show 阶段支持随机位置（默认）和 手动定义固定位置
+        (已限制随机初始化在墙内；限制随机初始化球在墙的右侧, target 在墙的左侧)
+    
     --------------------------------------------------
     参考 - Train 阶段位置初始化 (世界坐标参考):
 
@@ -20,13 +27,6 @@
     - tx (随机): [-0.3, -0.2] (位于墙左侧)
     - tz (随机): [0.05, 0.50] (悬浮或贴地)
     --------------------------------------------------
-        
-    目前环境支持：
-    1. 奖励设计+权重；
-    2. 课程学习（通过调整墙的高度）。
-    3. 通过 show.py 可视化训练结果; 录制视频; 
-    4. reset 逻辑: train 阶段随机初始化球和 target的位置(x, z); show 阶段支持随机位置（默认）和 手动定义固定位置
-        (已限制随机初始化在墙内；限制随机初始化球在墙的右侧, target 在墙的左侧)
 """
 import gymnasium as gym
 from gymnasium import spaces
@@ -90,10 +90,10 @@ class PlanarBringBallEnv(gym.Env):
         self.max_steps = self.cfg.episode_max_steps  # 单个 episode 最大步数限制
         self.success_threshold = self.cfg.success_threshold
 
-        self.w_h2b = self.cfg.reward_weight_hand_to_ball  # reward 权重
-        self.w_b2t = self.cfg.reward_weight_ball_to_target
-        self.w_gate = self.cfg.reward_weight_gate
-        self.w_success = self.cfg.reward_success
+        self.w_1 = self.cfg.reward_weight_1  # reward 权重
+        self.w_2 = self.cfg.reward_weight_2
+        self.w_3 = self.cfg.reward_weight_3
+        self.w_success = self.cfg.reward_weight_success
 
         # 状态变量
         self.current_step = 0
@@ -164,28 +164,61 @@ class PlanarBringBallEnv(gym.Env):
         obs = self._get_obs()
         
         # Step2: 定义奖励
-        # 奖励：靠近球 + 靠近目标；计算欧氏距离：结果是数学纯量（Scalar）
+        # 本质上分解任务，随着结果朝好的方向发展，reward 始终保持上升趋势，且梯度稳定，且鼓励在“波动端“朝好的方向发展
+        # 一种方式处理负奖励：通过 if 语句，在突破点，用一个正数（即突破奖励） - weight*（负奖励），确保奖励随进度正相关
+        # 另一种方式：构造平滑的函数适应这种，exp，tanh
+        # 最好那个控制奖励，实现梯度稳定
+        # 逐步引导或者添加算法本身的探索性
+        # 另一种方式：参考xxx，clip等等
+
+        # 计算欧氏距离：结果是数学纯量（Scalar）
         dist_h2b = np.linalg.norm(self.data.site_xpos[self.pinch_id] - self.data.xpos[self.ball_id])
         dist_b2t = np.linalg.norm(self.data.xpos[self.ball_id] - self.data.site_xpos[self.target_id])
-        
-        # 组合总奖励：基础惩罚（距离越远奖励越低）
-        reward = -(self.w_h2b * dist_h2b) - (self.w_b2t * dist_b2t)
-        
-        # 绕路引导逻辑权重化
+
+        # reward1(-)：引导手靠近球
+        reward_reach = - self.w_1 * dist_h2b 
+
+        # reward2(+): 引导抓取：如果手离球很近，给一个额外的“鼓励抓取”奖励
+        # 可以通过判断两个手指头的位移，或者简单的距离阈值
+        reward_grasp = 0
+        if dist_h2b < 0.05:
+            # 引导 grasp 关节闭合 (假设 action[4] 是抓取)
+            reward_grasp = self.w_2 * (1.0 - dist_h2b/0.05)  # 0.5
+
+        # reward3(+): 带球奖励：只有当球离开地面，或者球与手距离极近时，才增加 dist_b2t 的权重
+        # 否则 Agent 会在还没碰到球时就想去 target，导致姿态扭曲
+        reward_bring = 0
+        if dist_h2b < 0.03:
+            reward_bring = 2.0 - (self.w_3 * dist_b2t)  # 2
+
+        reward = reward_reach + reward_grasp + reward_bring
+
+        """
+        # 绕路引导
         if obs[8] < 0.2 and obs[10] > 0.2:
             dist_to_gate = np.linalg.norm(self.data.site_xpos[self.pinch_id] - [0.2, 0, self.wall_height + 0.1])
             reward -= self.w_gate * dist_to_gate
+        """
 
-        # 成功终止逻辑
+        # 终止逻辑 & reward_success
         self.current_step += 1
         terminated = False
+        is_success=0
         if dist_b2t < self.success_threshold:
             reward += self.w_success # 给予一笔“终点奖金”
             terminated = True
+            is_success = 1.0
             
         truncated = self.current_step >= self.max_steps
 
-        return obs, reward, terminated, truncated, {}
+        # 组装 info
+        info = {
+            "is_success": is_success,
+            "dist_b2t": dist_b2t,
+            "dist_h2b": np.linalg.norm(self.data.site_xpos[self.pinch_id] - self.data.xpos[self.ball_id])
+        }
+
+        return obs, reward, terminated, truncated, info
 
     def reset(self, seed: int = None, options: dict = None):
         """重置环境到初始状态。

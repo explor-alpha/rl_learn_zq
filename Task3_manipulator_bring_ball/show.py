@@ -1,11 +1,16 @@
 """
 show.py: 平面机械手抓球任务—演示与录制脚本
+    支持功能：
+    1. 基础功能：演示和录制训练结果
+    2. Key-泛化性测试，即，测试 train 时没见过的 env 初始状态,
+        获取 train 阶段环境参数: mjpython Task3_manipulator_bring_ball/show.py --help
+        演示示例: mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "exp-00_PPO_debug_test011" --fps 90    
 """
 import os
 import time
 import argparse
 import numpy as np
-import imageio  # 用于高质量视频导出
+import imageio
 
 # 屏蔽一些不必要的警告
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"

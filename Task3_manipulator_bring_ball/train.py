@@ -1,9 +1,18 @@
 """
-包含课程学习、评估环境归一化同步及自动存档功能。
-加入打印点
-"""
+train.py: 自定义训练脚本
+    对应任务: 平面机械手抓球——DeepMind Control Suite 中的 Manipulator 经典任务
+    对应 MuJoCo 的模型实例: "manipulator_bring_ball.xml" 
+    采用 stable_baselines3 框架
 
-"""
+    支持功能：
+    1. 课程学习
+    2. 评估环境归一化同步
+    3. 断点续训
+
+--------------------------------------------------
+Notes: 
+
+
 SB3-环境配置：
 1. 基础配置：
     - 通常将 XML 导入的环境通过三层包装。一层是用于记录。一层是向量化，转化成数组运行的方式，一层是归一化。
@@ -20,13 +29,14 @@ SB3-环境配置：
         通过 EvalCallback 的 Hook: callback_after_eval传入这个 callback。
         确保每一次评估时评估环境拿到的 observation 归一化参数都是最新
 
-
-
+        
 SB3-Callback-记录 reward & 保存最优model.zip+同步的 .pkl
 - EvalCallback：本身可以配合 tensorboard 记录每次评估时的 reward。
 - EvalCallback + Hook-callback_on_new_best(定义SaveVecNormalizeCallback)：通过评估的 reward 保存最优model.zip+同步的 .pkl
 
+
 课程学习 + SB3-训练逻辑：
+
 
 PS：
     Q: EvalCallback本身就能处理原始的reward？
@@ -40,12 +50,13 @@ PS：
 PS-tensorboard：
 - eval/mean_reward 定义的环境 norm_reward=False 则曲线显示的就是原始物理分数    
 
+
 PS：
 定义 Agent 时候传入的 cfg.n_steps 超参数：每次训练前采集的总样本量 = n_steps * n_envs (例如 512)
 EvalCallback中传入的 eval_freq=cfg.n_steps*4, # 每四轮梯度回传参数更新评估一次
 在课程学习定义逻辑当中 learn 函数里的 cfg.total_timesteps 表示每这么多步进行结课评估，用于判断是否进入下一课程。
+--------------------------------------------------
 """
-
 import os
 # 应该是安装依赖的时候，conda pip 重复安装了 numpy，这里先跳过报错
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -111,6 +122,28 @@ class SaveVecNormalizeCallback(BaseCallback):
         return True
 
 
+class InfoLoggerCallback(BaseCallback):
+    """
+    自定义 Callback：从 env 的 info 中提取指标并记录到 TensorBoard
+    """
+    def __init__(self, verbose=0):
+        super().__init__(verbose)
+        self.success_buffer = []
+
+    def _on_step(self) -> bool:
+        # self.locals['infos'] 是一个包含所有并行环境 info 字典的列表
+        for info in self.locals['infos']:
+            if "is_success" in info:
+                self.success_buffer.append(info["is_success"])
+                # 记录实时高度
+                self.logger.record_mean("env/dist_ball_to_target", info["dist_b2t"])
+
+        # 每 2048 步计算一次平均成功率并记录
+        if len(self.success_buffer) >= 2048:
+            self.logger.record("env/rolling_success_rate", np.mean(self.success_buffer))
+            self.success_buffer = []
+        return True
+
 def evaluate(model, env, n_episodes=5, max_steps=500):
     """
     针对 VecNormalize 环境的鲁棒评估函数。
@@ -140,6 +173,28 @@ def evaluate(model, env, n_episodes=5, max_steps=500):
     env.norm_reward = old_norm_reward
     return np.mean(all_rewards)
 
+def extended_evaluate(model, env, n_episodes=20):
+    """
+    增强版评估函数：同时返回平均奖励和成功率
+    """
+    success_count = 0
+    total_rewards = []
+    
+    for _ in range(n_episodes):
+        obs = env.reset()
+        done = False
+        ep_rew = 0
+        while not done:
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, done, info = env.step(action)
+            # VecNormalize 会包装 info，SB3 会将其放在列表里
+            ep_rew += env.get_original_reward()[0]
+            if info[0].get("is_success", 0) > 0:
+                success_count += 1
+                done = True # 成功即停止本轮评估
+        total_rewards.append(ep_rew)
+    
+    return np.mean(total_rewards), success_count / n_episodes
 
 def train():
     """
@@ -199,6 +254,7 @@ def train():
     print("DEBUG: eval_env 成功...")
 
     # 结合自定义 Callback 以便同步保存 pkl
+    info_callback = InfoLoggerCallback()
     save_vec_callback = SaveVecNormalizeCallback(save_path=output_dir)
     sync_callback = SyncVecNormalizeCallback(env, eval_env)
     eval_callback = EvalCallback(
@@ -219,11 +275,11 @@ def train():
 
     while stage_idx < len(cfg.curriculum_stages):
         stage = cfg.curriculum_stages[stage_idx]
-        print(f"\n>>> 进入课程阶段 {stage_idx}: 墙高 = {stage['wall_height']}")
+        print(f"\n================ [阶段 {stage_idx}] 墙高: {stage['wall_height']} ================")
         
         # 1. 更新环境难度
-        env.env_method("set_wall_height", stage['wall_height'], indices=0)
-        eval_env.env_method("set_wall_height", stage['wall_height'], indices=0)
+        env.env_method("set_wall_height", stage['wall_height'])
+        eval_env.env_method("set_wall_height", stage['wall_height'])
 
         """
         # --- 新增：在 TensorBoard 中记录当前阶段信息 ---
@@ -240,27 +296,28 @@ def train():
         # 训练
         model.learn(
             total_timesteps=cfg.total_timesteps, 
-            reset_num_timesteps=False,
-            tb_log_name="PPO_training",  # tb_log_name=f"stage_{stage_idx}",
-            callback=eval_callback
+            reset_num_timesteps=False,   # 保证 Tensorboard 曲线的连续性，不会在进入新课程时从 0 开始
+            tb_log_name="PPO_run",  # tb_log_name=f"stage_{stage_idx}",
+            callback=[eval_callback, info_callback]
         )
 
-        # 阶段性强制存档（用于断点续训）
-        model.save(latest_model_path)
-        env.save(latest_stats_path)
+        # 阶段结课评估
+        mean_reward, success_rate = extended_evaluate(model, eval_env, n_episodes=30)
+        print(f"阶段 {stage_idx} 结束 | 成功率: {success_rate:.2%} | 平均奖励: {mean_reward:.2f}")
 
-        # 3. 调用 evaluate 函数，获取真实奖励，并和阈值对比，以判断是否进入下一阶段
-        mean_reward = evaluate(model, eval_env)
-        print(f"阶段评估结束，平均奖励: {mean_reward:.2f} (目标: {stage['threshold']})")
-        
-        # 4. 判断是否晋级
-        if mean_reward > stage['threshold']:
-            print("--- 达标，进入下一课程！ ---")
+        # 存档当前阶段模型 (即使没过，也存一下作为 backup)
+        stage_save_path = os.path.join(cfg.output_dir, f"model_stage_{stage_idx}.zip")
+        model.save(stage_save_path)
+        print(f"已保存当前阶段模型至: {stage_save_path}")
+
+        # 晋级判断
+        if success_rate >= 0.8:
+            print(f"🎉 成功率 {success_rate:.2%} 达标，晋级下一课程！")
             stage_idx += 1
         else:
-            print("--- 课程未达标，继续练！ ---")
-
-
+            print(f"❌ 成功率未达标，将在本阶段继续训练。")
+            # 可以在这里根据需要调整学习率，防止在同一关卡卡死
+            # model.learning_rate = 1e-4 
 
 if __name__ == "__main__":
     train()
