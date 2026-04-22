@@ -1,3 +1,6 @@
+"""
+show.py: 平面机械手抓球任务—演示与录制脚本
+"""
 import os
 import time
 import argparse
@@ -13,22 +16,51 @@ from env import PlanarBringBallEnv
 from config import TrainConfig
 
 def get_args():
-    parser = argparse.ArgumentParser(description="SB3 模型高质量演示与录制脚本")
+    description = """
+    平面机械手抓球任务—演示与录制脚本
+    --------------------------------------------------
+    参考 - Train 阶段位置初始化 (世界坐标参考):
+
+    1. 墙体 (Wall):
+    - 位置: 固定在 x = 0.2
+    - 高度: 0.00 ~ 0.30 (wall_height, defined in config.py)
+
+    2. 球 (Ball) 初始范围:
+    - x (随机): [0.25, 0.35] (位于墙右侧)
+    - z: 约为 0.023, 可取0.03 (略高于地面，防止穿透)
+
+    3. 目标 (Target) 初始范围:
+    - tx (随机): [-0.3, -0.2] (位于墙左侧)
+    - tz (随机): [0.05, 0.50] (悬浮或贴地)
+    --------------------------------------------------
+    调用示例:
+    mjpython Task3_manipulator_bring_ball/show.py --help
+    mjpython Task3_manipulator_bring_ball/show.py --mode human
+    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.20 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "exp-00_PPO_debug_test011"
+    mjpython Task3_manipulator_bring_ball/show.py --mode video --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "exp-00_PPO_debug_test011" --fps 90    
+    """
+
+    parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
+    
     # 基础模式
     parser.add_argument("--mode", type=str, default="human", choices=["human", "video"], 
-                        help="运行模式: human (实时渲染) 或 video (高质量录制)")
+                        help="运行模式: human (实时渲染) 或 video (录制)")
     
     # 环境控制参数
-    parser.add_argument("--wall", type=float, default=0.0, help="设置墙的高度 (课程学习参数)")
+    parser.add_argument("--wall", type=float, default=0.30, 
+                        help="设置墙的高度 (课程学习)")
     parser.add_argument("--ball", type=float, nargs=2, metavar=('X', 'Z'), 
-                        help="手动指定球的初始位置 (例如: --ball 0.4 0.2)")
+                        help="手动指定球的初始位置; (例如: --ball 0.30 0.03)")
     parser.add_argument("--target", type=float, nargs=2, metavar=('X', 'Z'), 
-                        help="手动指定目标的位置 (例如: --target -0.4 0.5)")
+                        help="手动指定目标的位置; (例如: --target -0.25 0.4)")
     
     # 运行配置
-    parser.add_argument("--steps", type=int, default=1000, help="运行的总步数")
-    parser.add_argument("--exp_name", type=str, default="exp-00_PPO_debug_test011", help="实验目录名称")
-    parser.add_argument("--fps", type=int, default=60, help="视频帧率 (推荐 60 以保持丝滑)")
+    parser.add_argument("--steps", type=int, default=1000, 
+                        help="运行的总步数")
+    parser.add_argument("--exp_name", type=str, default="exp-00_PPO_debug_test011", 
+                        help="实验目录名称; 例如 exp-00_PPO_debug_test011")
+    parser.add_argument("--fps", type=int, default=90, 
+                        help="渲染/视频帧率")
     
     return parser.parse_args()
 
@@ -46,13 +78,12 @@ def main():
         print(f"错误: 找不到模型文件 {model_path}")
         return
 
-    # 2. 渲染模式确定
-    # 注意：录制视频必须使用 rgb_array
+    # 2. 选择渲染模式
     render_mode = "human" if args.mode == "human" else "rgb_array"
 
-    # 3. 创建环境工厂
+    # 3. 环境
     def make_env():
-        # 如果是 video 模式，PlanarBringBallEnv 内部会初始化 Renderer
+        # 如果 render_mode 是 video 模式，Env 内部会初始化 Renderer
         env = PlanarBringBallEnv(model_path=cfg.xml_path, render_mode=render_mode)
         return env
 
@@ -85,41 +116,38 @@ def main():
     try:
         for i in range(args.steps):
             action, _states = model.predict(obs, deterministic=True)
+            # SB3 的 VecEnv 中，会自动将 terminated 和 truncated 合并成一个布尔值 done（兼容旧版 gym 协议）
             obs, rewards, dones, infos = env.step(action)
             
             if args.mode == "human":
                 env.render()
-                time.sleep(0.01) # 稍微减慢预览速度
+                time.sleep(1.0 / args.fps) # 稍微减慢预览速度；尽量匹配环境的渲染速度 (1/90s)
             else:
-                # 录制模式：手动提取帧
-                # venv.render() 在 rgb_array 模式下返回的是包含 1 个数组的 list
-                # 调用env.render() ，刷帧
+                # 录制模式：手动提取帧；调用env.render() ，刷帧
                 frame = env.render() 
-                if isinstance(frame, list):
-                    frames.append(frame[0])
-                else:
-                    frames.append(frame)
+                frames.append(frame)
             
             if dones[0]:
                 print(f"Episode 结束 (Step {i})")
                 if args.mode == "video": 
-                    break # 录制模式通常只录一个完整的 Episode
+                    break 
+                # 录制模式通常只录一个完整的 Episode
                 obs = env.reset()
 
-        # 8. 高质量导出视频
+        # 8. 导出视频
         if args.mode == "video" and len(frames) > 0:
             os.makedirs(video_folder, exist_ok=True)
             timestamp = time.strftime("%Y%m%d-%H%M%S")
-            video_path = os.path.join(video_folder, f"high_quality_wall_{args.wall}_{timestamp}.mp4")
+            video_name = f"eval_wall_{args.wall}_{timestamp}.mp4"
+            video_path = os.path.join(video_folder, video_name)
             
-            print(f"正在以超高码率合成视频...")
+            print(f"正在合成视频...")
             imageio.mimsave(
                 video_path, 
                 frames, 
                 fps=args.fps, 
-                codec='libx264', # 指定使用 H.264 编码
-                pixelformat='yuv420p', # 标准像素格式
-                # CRF 10 几乎是肉眼无损的级别，preset veryslow 让编码更细腻
+                codec='libx264', 
+                pixelformat='yuv420p', 
                 output_params=['-crf', '10', '-preset', 'veryslow'] 
             )
             print(f"✅ 视频已保存至: {video_path}")

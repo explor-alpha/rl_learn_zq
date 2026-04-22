@@ -5,6 +5,22 @@
         原始xml来源(略微修改): https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml
         "manipulator_bring_ball.xml"可通过 test_xml.py 展示
 
+    --------------------------------------------------
+    参考 - Train 阶段位置初始化 (世界坐标参考):
+
+    1. 墙体 (Wall):
+    - 位置: 固定在 x = 0.2
+    - 高度: 0.00 ~ 0.30 (wall_height, defined in config.py)
+
+    2. 球 (Ball) 初始范围:
+    - x (随机): [0.25, 0.35] (位于墙右侧)
+    - z: 约为 0.023, 可取0.03 (略高于地面，防止穿透)
+
+    3. 目标 (Target) 初始范围:
+    - tx (随机): [-0.3, -0.2] (位于墙左侧)
+    - tz (随机): [0.05, 0.50] (悬浮或贴地)
+    --------------------------------------------------
+        
     目前环境支持：
     1. 奖励设计+权重；
     2. 课程学习（通过调整墙的高度）。

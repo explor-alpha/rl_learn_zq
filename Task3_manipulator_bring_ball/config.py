@@ -31,9 +31,9 @@ class TrainConfig:
     # --- 课程学习配置 ---
     curriculum_stages: List[Dict] = field(default_factory=lambda: [
         {"wall_height": 0.00, "threshold": -50},
-        {"wall_height": 0.15, "threshold": -40},
-        {"wall_height": 0.30, "threshold": -30},
-        {"wall_height": 0.45, "threshold": -20},
+        {"wall_height": 0.10, "threshold": -40},
+        {"wall_height": 0.20, "threshold": -30},
+        {"wall_height": 0.30, "threshold": -20},
     ])
 
     # --- 自动生成的路径 (在 post_init 中处理) ---
