@@ -40,9 +40,9 @@ def get_args():
     --------------------------------------------------
     调用示例: 
     mjpython Task3_manipulator_bring_ball/show.py --help
-    mjpython Task3_manipulator_bring_ball/show.py --mode human
-    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.20 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "exp-00_PPO_debug_test011"
-    mjpython Task3_manipulator_bring_ball/show.py --mode video --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "exp-00_PPO_debug_test011" --fps 90    
+    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.00 --exp_name "exp-01_PPO_reward1"
+    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.20 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "exp-de_PPO_debug_test011"
+    mjpython Task3_manipulator_bring_ball/show.py --mode video --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "exp-de_PPO_debug_test011" --fps 90    
     """
 
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -62,8 +62,8 @@ def get_args():
     # 运行配置
     parser.add_argument("--steps", type=int, default=1000, 
                         help="运行的总步数")
-    parser.add_argument("--exp_name", type=str, default="exp-00_PPO_debug_test011", 
-                        help="实验目录名称; 例如 exp-00_PPO_debug_test011")
+    parser.add_argument("--exp_name", type=str, default="exp-de_PPO_debug_test011", 
+                        help="(outputs 文件夹中）实验目录名称; ")
     parser.add_argument("--fps", type=int, default=90, 
                         help="渲染/视频帧率")
     

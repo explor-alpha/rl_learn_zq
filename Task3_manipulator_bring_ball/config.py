@@ -10,8 +10,11 @@ from typing import List, Dict
 @dataclass
 class TrainConfig:
     # --- 实验元信息 ---
-    exp_name: str = "exp-01_PPO"
+    exp_name: str = "v2_exp-01_PPO_r1"
     task_dir: str = os.path.dirname(os.path.abspath(__file__))
+    xml_path: str = os.path.join(task_dir, "xml", "manipulator_bring_ball.xml")
+    output_dir: str = os.path.join(task_dir, "outputs", exp_name)
+    os.makedirs(output_dir, exist_ok=True)
 
     # --- PPO 超参 ---
     learning_rate: float = 3e-4
@@ -40,26 +43,3 @@ class TrainConfig:
         {"wall_height": 0.20},
         {"wall_height": 0.30},
     ])
-
-    # --- 自动生成：路径参数---
-    output_dir: str = ""
-    latest_model_path: str = ""
-    latest_stats_path: str = ""
-    best_model_path: str = ""
-    xml_path: str = ""
-
-    def __post_init__(self):
-        """在初始化后自动构建路径"""
-        # 输出根目录
-        self.output_dir = os.path.join(self.task_dir, "outputs", self.exp_name)
-        
-        # 具体模型路径
-        self.latest_model_path = os.path.join(self.output_dir, "latest_model")
-        self.latest_stats_path = os.path.join(self.output_dir, "latest_vec_normalize.pkl")
-        self.best_model_path = os.path.join(self.output_dir, "best_model")
-        
-        # 环境 XML 路径
-        self.xml_path = os.path.join(self.task_dir, "xml", "manipulator_bring_ball.xml")
-        
-        # 自动创建输出目录
-        os.makedirs(self.output_dir, exist_ok=True)

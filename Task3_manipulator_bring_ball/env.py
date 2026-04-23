@@ -102,7 +102,6 @@ class PlanarBringBallEnv(gym.Env):
         self.fixed_target_xz = None
 
         self.target_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "target_ball")
-        # 获取该 body 对应的 mocap 索引
         self.target_mocap_id = self.model.body_mocapid[self.target_body_id]
 
         # 渲染器初始化，仅用于 show.py，不影响 train
