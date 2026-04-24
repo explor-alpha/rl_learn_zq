@@ -297,7 +297,7 @@ def train():
         
             b_total_steps = model.num_timesteps
             b_name = f"stage-{stage_idx}_step-{b_total_steps}"
-            # b_model_filename = f"model_{b_name}"
+            best_model_dir = best_dir
             b_stats_filename = f"vec-normalize_{b_name}.pkl"
 
             for file in os.listdir(best_dir):
