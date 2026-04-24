@@ -288,16 +288,16 @@ def train():
 
     while stage_idx < total_stages:
         # --- best 保存路径(覆盖逻辑) ，仅最后阶段保存，减小计算开销---
-        is_last_stage = (stage_idx == total_stages - 1)
-        best_model_path = None
+        if_save_best = True  # if_save_best = (stage_idx == total_stages - 1)
+        best_model_dir = None
         save_vec_callback = None
 
-        if is_last_stage:
+        if if_save_best:
             print(f"检测到当前为最后阶段 (Stage {stage_idx})，将开启最优模型记录...")
         
             b_total_steps = model.num_timesteps
             b_name = f"stage-{stage_idx}_step-{b_total_steps}"
-            b_model_filename = f"model_{b_name}"
+            # b_model_filename = f"model_{b_name}"
             b_stats_filename = f"vec-normalize_{b_name}.pkl"
 
             for file in os.listdir(best_dir):
@@ -316,7 +316,7 @@ def train():
 
         eval_callback = EvalCallback(
             eval_env, 
-            best_model_save_path=best_dir,   # save best model(.zip)；EvalCallback中此参数应该是 zip 的上级文件夹
+            best_model_save_path=best_model_dir,   # save best model(.zip)；EvalCallback中此参数应该是 zip 的上级文件夹
             log_path=output_dir, 
             eval_freq=cfg.eval_freq_steps, # 每四轮梯度回传参数更新评估一次
             deterministic=True, 
@@ -361,12 +361,14 @@ def train():
 
         # --- 逻辑 1：更新 latest 文件夹 (覆盖逻辑) ---
         print(f"正在更新 latest 存档...")
+        """
         # 清空 latest 文件夹中的旧文件（确保只有最新的）
         for file in os.listdir(latest_dir):
             file_path = os.path.join(latest_dir, file)
             try:
                 if os.path.isfile(file_path): os.unlink(file_path)
             except Exception as e: print(f"清理失败: {e}")
+        """
 
         # 保存最新模型和环境统计
         latest_model_path = os.path.join(latest_dir, model_filename)

@@ -10,7 +10,7 @@ from typing import List, Dict
 @dataclass
 class TrainConfig:
     # --- 实验元信息 ---
-    exp_name: str = "v2_exp-01_PPO_r1"
+    exp_name: str = "v2.1_exp-01_PPO_r1"
     task_dir: str = os.path.dirname(os.path.abspath(__file__))
     xml_path: str = os.path.join(task_dir, "xml", "manipulator_bring_ball.xml")
     output_dir: str = os.path.join(task_dir, "outputs", exp_name)

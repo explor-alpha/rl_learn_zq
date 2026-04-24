@@ -7,6 +7,7 @@ show.py: 平面机械手抓球任务—演示与录制脚本
         演示示例: mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "exp-00_PPO_debug_test011" --fps 90    
 """
 import os
+import glob
 import time
 import argparse
 import numpy as np
@@ -40,9 +41,9 @@ def get_args():
     --------------------------------------------------
     调用示例: 
     mjpython Task3_manipulator_bring_ball/show.py --help
-    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.00 --exp_name "exp-01_PPO_reward1"
-    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.20 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "exp-de_PPO_debug_test011"
-    mjpython Task3_manipulator_bring_ball/show.py --mode video --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "exp-de_PPO_debug_test011" --fps 90    
+    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.00 --exp_name "v2_exp-01_PPO_r1"
+    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.20 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v2_exp-01_PPO_r1"
+    mjpython Task3_manipulator_bring_ball/show.py --mode video --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "v2_exp-01_PPO_r1" --fps 90    
     """
 
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -62,8 +63,8 @@ def get_args():
     # 运行配置
     parser.add_argument("--steps", type=int, default=1000, 
                         help="运行的总步数")
-    parser.add_argument("--exp_name", type=str, default="exp-de_PPO_debug_test011", 
-                        help="(outputs 文件夹中）实验目录名称; ")
+    parser.add_argument("--exp_name", type=str, 
+                        help="(outputs 文件夹中）实验目录名称")
     parser.add_argument("--fps", type=int, default=90, 
                         help="渲染/视频帧率")
     
@@ -75,13 +76,25 @@ def main():
 
     # 1. 路径配置
     log_dir = os.path.join(cfg.task_dir, "outputs", args.exp_name) 
-    stats_path = os.path.join(log_dir, "best_vec_normalize.pkl")
-    model_path = os.path.join(log_dir, "best_model", "best_model.zip")
-    video_folder = os.path.join(log_dir, "videos")
+    choose_model_dir = os.path.join(log_dir, "latest")  # 可选 "best" "latest" "stages"
 
-    if not os.path.exists(model_path):
-        print(f"错误: 找不到模型文件 {model_path}")
-        return
+    # 搜索后缀为 .pkl 的文件
+    stats_files = glob.glob(os.path.join(choose_model_dir, "*.pkl"))
+    stats_path = stats_files[0] if stats_files else None
+
+    # 搜索后缀为 .zip 的文件
+    model_files = glob.glob(os.path.join(choose_model_dir, "*.zip"))
+    model_path = model_files[0] if model_files else None
+
+    # 打印结果检查
+    print(f"找到的统计文件: {stats_path}")
+    print(f"找到的模型文件: {model_path}")
+
+    # 容错处理
+    if not stats_path or not model_path:
+        raise FileNotFoundError(f"在 {choose_model_dir} 中未找到必要的 .pkl 或 .zip 文件")
+
+    video_folder = os.path.join(log_dir, "videos")
 
     # 2. 选择渲染模式
     render_mode = "human" if args.mode == "human" else "rgb_array"
