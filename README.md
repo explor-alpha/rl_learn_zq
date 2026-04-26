@@ -5,32 +5,32 @@
 
 ### 🎬 平面机械手抓球任务演示 (Task3)
 
+> v2.1 训练效果对比演示
 
-<h4>2. v2.1 训练效果对比演示</h4>
 <p>从左到右依次为：延迟抓取、抓空球情况、成功抓取但未送达目标</p>
 
-<!-- 第一段视频：占据一行 -->
+<!-- 第一张大图：独占一行 -->
 <div align="center">
-  <video src="Task3_manipulator_bring_ball/show_results/env_随机初始化球和目标位置.mp4" width="100%" controls></video>
-  <p>自定义环境 env.py：随机初始化演示：需抓取的球体 (右侧) & 目标位置 (左侧)</p>
+  <img src="Task3_manipulator_bring_ball/show_results/env_init.gif" width="80%" alt="环境初始化展示">
+  <p><b>图 1：环境随机初始化（球与目标位置）</b></p>
 </div>
 
 <br/>
 
-<!-- 后面三段视频：并排展示 -->
-<table style="width: 100%; table-layout: fixed;">
-  <tr>
-    <td align="center">
-      <video src="Task3_manipulator_bring_ball/show_results/v2.1_迟迟不抓.mp4" width="100%" controls></video>
-      <p>延迟抓取</p>
+<!-- 后三张小图：并排一行 -->
+<table style="width: 100%; border-collapse: collapse; border: none;">
+  <tr style="border: none;">
+    <td width="33.3%" align="center" style="border: none;">
+      <img src="Task3_manipulator_bring_ball/show_results/v2.1_delay.gif" width="100%">
+      <br><sub>延迟抓取</sub>
     </td>
-    <td align="center">
-      <video src="Task3_manipulator_bring_ball/show_results/v2.1_抓空球.mp4" width="100%" controls></video>
-      <p>抓空球情况</p>
+    <td width="33.3%" align="center" style="border: none;">
+      <img src="Task3_manipulator_bring_ball/show_results/v2.1_miss.gif" width="100%">
+      <br><sub>抓空球情况</sub>
     </td>
-    <td align="center">
-      <video src="Task3_manipulator_bring_ball/show_results/v2.1_抓.mp4" width="100%" controls></video>
-      <p>成功抓取但未送达</p>
+    <td width="33.3%" align="center" style="border: none;">
+      <img src="Task3_manipulator_bring_ball/show_results/v2.1_success.gif" width="100%">
+      <br><sub>成功抓取</sub>
     </td>
   </tr>
 </table>
