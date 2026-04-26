@@ -1,39 +1,39 @@
 # 强化学习 学习过程记录 & 辅修课程“数据驱动的智能控制”⼤作业   —**上海大学 郑群 23122932**  
 
 > Task3 成果展示：  
-> 基于给定 xml(略作修改)，从 0 实现：“平面机械手跨越障碍抓球“**：
+> 基于给定 xml(略作修改)，从 0 实现：“平面机械手跨越障碍抓球“：
 
+### 🎬 平面机械手抓球任务演示 (Task3)
+
+
+<h4>2. v2.1 训练效果对比演示</h4>
+<p>从左到右依次为：延迟抓取、抓空球情况、成功抓取但未送达目标</p>
+
+<!-- 第一段视频：占据一行 -->
 <div align="center">
-  <h3>🎬 自定义环境 env.py：随机初始化演示</h3>
-  <p>随机化分布：需抓取的球体 & 目标位置</p>
-  <video src="Task3_manipulator_bring_ball/show_results/env_随机初始化球和目标位置.mov" controls="controls" autoplay="autoplay" loop="loop" muted="muted" style="max-width: 600px;">
-  </video>
+  <video src="Task3_manipulator_bring_ball/show_results/env_随机初始化球和目标位置.mp4" width="100%" controls></video>
+  <p>自定义环境 env.py：随机初始化演示：需抓取的球体 (右侧) & 目标位置 (左侧)</p>
 </div>
 
-<div align="center">
-  <h3>🎬 v2.1 训练效果演示</h3>
-  <p>从左到右依次为：延迟抓取、抓空球情况、成功抓取</p>
-  <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-    <div style="flex: 1; max-width: 300px;">
-      <p style="font-size: 14px;">迟迟不抓</p>
-      <video src="Task3_manipulator_bring_ball/show_results/v2.1 迟迟不抓.mov" 
-             controls autoplay loop muted style="width: 100%; border-radius: 8px;">
-      </video>
-    </div>
-    <div style="flex: 1; max-width: 300px;">
-      <p style="font-size: 14px;">抓空球</p>
-      <video src="Task3_manipulator_bring_ball/show_results/v2.1 抓空球.mov" 
-             controls autoplay loop muted style="width: 100%; border-radius: 8px;">
-      </video>
-    </div>
-    <div style="flex: 1; max-width: 300px;">
-      <p style="font-size: 14px;">成功抓取,但没有送至目标区域</p>
-      <video src="Task3_manipulator_bring_ball/show_results/v2.1 抓.mov" 
-             controls autoplay loop muted style="width: 100%; border-radius: 8px; border: 2px solid #4CAF50;">
-      </video>
-    </div>
-  </div>
-</div>
+<br/>
+
+<!-- 后面三段视频：并排展示 -->
+<table style="width: 100%; table-layout: fixed;">
+  <tr>
+    <td align="center">
+      <video src="Task3_manipulator_bring_ball/show_results/v2.1_迟迟不抓.mp4" width="100%" controls></video>
+      <p>延迟抓取</p>
+    </td>
+    <td align="center">
+      <video src="Task3_manipulator_bring_ball/show_results/v2.1_抓空球.mp4" width="100%" controls></video>
+      <p>抓空球情况</p>
+    </td>
+    <td align="center">
+      <video src="Task3_manipulator_bring_ball/show_results/v2.1_抓.mp4" width="100%" controls></video>
+      <p>成功抓取但未送达</p>
+    </td>
+  </tr>
+</table>
 
 ---
 
