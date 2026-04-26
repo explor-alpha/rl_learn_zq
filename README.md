@@ -1,11 +1,11 @@
 # 强化学习 学习过程记录 & 辅修课程“数据驱动的智能控制”⼤作业   —**上海大学 郑群 23122932**  
 
 > Task3 成果展示：  
-> 基于给定 xml(略作修改)，从 0 实现：“平面机械手跨越障碍抓球“：
+> 基于给定 xml(略作修改)，从 0 实现：“平面机械手跨越障碍抓球“：  
 
 ### 🎬 平面机械手抓球任务演示 (Task3)
 
-> v2.1 训练效果对比演示
+> v2.1 训练效果对比演示  
 
 <!-- 第一张：环境初始化（占一整行） -->
 <div align="center">
@@ -49,7 +49,7 @@ rl_learn_zq_native/
 │   └── utils/                    # 工具函数 & 神经网络骨架(Actor/Critic)对比
 ```
 
-- 任务概述：基于手写算法，跑通 CartPole，Pendulum，并观察结果。从而感受各个算法的性能并了解底层组件的定义。
+- 任务概述：基于手写算法，跑通 CartPole，Pendulum，并观察结果。从而感受各个算法的性能并了解底层组件的定义。  
     - CartPole：对比离散型动作输出算法： DQN，Actor-Critic，TPRO-concrete，PPO-concrete，SAC-concrete  
     - Pendulum：对比连续型动作输出算法： TPRO-continuous，PPO-continuous，SAC-continuous  
 
@@ -64,12 +64,12 @@ rl_learn_zq_native/
 ├── Task2_sb3_sop/      # 【Task2】：尝试使用 Stable Baselines3 框架
 ```
 
-- 核心目标: 熟悉 SB3
-- 任务概述：尝试使用 Stable Baselines3 框架, 解决稍微困难些的任务 PandaReach-v3
+- 核心目标: 熟悉 SB3  
+- 任务概述：尝试使用 Stable Baselines3 框架, 解决稍微困难些的任务 PandaReach-v3  
 
 ---
 
-**Task3(Key): 基于给定 xml(略作修改)，从 0 实现“平面机械手跨越障碍抓球“**：
+**Task3(Key): 基于给定 xml(略作修改)，从 0 实现“平面机械手跨越障碍抓球“**：  
 
 ```
 rl_learn_zq_native/
@@ -91,13 +91,13 @@ rl_learn_zq_native/
 │   └── show.py                            # 自定义：演示 & 视频录制脚本
 ```
 
-- 任务概述：从基于给定 xml(略作修改)，从 0 实现“平面机械手跨越障碍抓球“
+- 任务概述：从基于给定 xml(略作修改)，从 0 实现“平面机械手跨越障碍抓球“  
     - 探索基于 mojoco+SB3 的 RL 任务训练流程：尝试自定义环境（observation，reward等等逻辑），自定义训练脚本（调用 SB3；课程学习；Callback-tensorboard等等逻辑）  
     - 添加可变动高度的隔板，感受课程学习的能力  
-    - [TODO]
+    - [TODO]  
 
-> 任务原型: DeepMind Control Suite: Manipulator
-> 原始xml来源(略微修改): https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml
+> 任务原型: DeepMind Control Suite: Manipulator  
+> 原始xml来源(略微修改): https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml  
 
 ### Tensorboard (Task3)  
 ``` zsh
