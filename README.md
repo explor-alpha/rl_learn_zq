@@ -7,30 +7,28 @@
 
 > v2.1 训练效果对比演示
 
-<p>从左到右依次为：延迟抓取、抓空球情况、成功抓取但未送达目标</p>
-
-<!-- 第一张大图：独占一行 -->
+<!-- 第一张：环境初始化（占一整行） -->
 <div align="center">
-  <img src="Task3_manipulator_bring_ball/show_results/env_init.gif" width="80%" alt="环境初始化展示">
+  <img src="Task3_manipulator_bring_ball/show_results/env_随机初始化球和目标位置.gif" width="80%" alt="环境初始化">
   <p><b>图 1：环境随机初始化（球与目标位置）</b></p>
 </div>
 
 <br/>
 
-<!-- 后三张小图：并排一行 -->
+<!-- 后面三张：并排展示 -->
 <table style="width: 100%; border-collapse: collapse; border: none;">
   <tr style="border: none;">
     <td width="33.3%" align="center" style="border: none;">
-      <img src="Task3_manipulator_bring_ball/show_results/v2.1_delay.gif" width="100%">
+      <img src="Task3_manipulator_bring_ball/show_results/v2.1_迟迟不抓.gif" width="100%">
       <br><sub>延迟抓取</sub>
     </td>
     <td width="33.3%" align="center" style="border: none;">
-      <img src="Task3_manipulator_bring_ball/show_results/v2.1_miss.gif" width="100%">
+      <img src="Task3_manipulator_bring_ball/show_results/v2.1_抓空球.gif" width="100%">
       <br><sub>抓空球情况</sub>
     </td>
     <td width="33.3%" align="center" style="border: none;">
-      <img src="Task3_manipulator_bring_ball/show_results/v2.1_success.gif" width="100%">
-      <br><sub>成功抓取</sub>
+      <img src="Task3_manipulator_bring_ball/show_results/v2.1_抓.gif" width="100%">
+      <br><sub>成功抓取但未送达目标</sub>
     </td>
   </tr>
 </table>
