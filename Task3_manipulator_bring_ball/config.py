@@ -25,7 +25,7 @@ class TrainConfig:
     episode_max_steps: int = 1000  # env.py，单个 episode 最大步数, 之后 truncated
     n_steps: int = 2048   # train.py, 2048 步数后进行一次梯度回传更新参数
     eval_freq_steps: int = 2048*4  # train.py，n_steps*4 调用 hook 评估训练效果
-    total_timesteps: int = 1000000  # train.py，learn，total_timesteps后评估一次课程训练效果，判断是否进入下一课程或终止
+    total_timesteps: int = 500000  # train.py，learn，total_timesteps后评估一次课程训练效果，判断是否进入下一课程或终止
 
     # --- reward 相关参数 ---
     # 成功终止条件

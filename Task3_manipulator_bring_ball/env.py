@@ -1,6 +1,6 @@
 """
 env.py: 自定义环境 
-    对应任务: 平面机械手抓球——DeepMind Control Suite 中的 Manipulator 经典任务
+    对应任务: 平面机械手抓球——(原型是: DeepMind Control Suite: Manipulator)
     对应 MuJoCo 的模型实例: "manipulator_bring_ball.xml" 
         原始xml来源(略微修改): https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml
         "manipulator_bring_ball.xml"可通过 test_xml.py 展示
@@ -37,7 +37,8 @@ from config import TrainConfig
 
 
 class PlanarBringBallEnv(gym.Env):
-    """一个平面机械臂将球带到目标点的 MuJoCo 强化学习环境。
+    """自定义 MuJoCo 强化学习环境
+    一个平面机械臂将球带到目标点的
 
     该环境模拟了一个具有 5 个执行器的平面机械臂以及一个球。
     任务是控制机械臂抓取（或推动）一个球，并跨越障碍，将其移动到指定的目标位置。
@@ -214,7 +215,7 @@ class PlanarBringBallEnv(gym.Env):
         info = {
             "is_success": is_success,
             "dist_b2t": dist_b2t,
-            "dist_h2b": np.linalg.norm(self.data.site_xpos[self.pinch_id] - self.data.xpos[self.ball_id])
+            "dist_h2b": dist_h2b
         }
 
         return obs, reward, terminated, truncated, info

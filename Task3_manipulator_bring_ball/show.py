@@ -7,6 +7,7 @@ show.py: 平面机械手抓球任务—演示与录制脚本
         演示示例: mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "exp-00_PPO_debug_test011" --fps 90    
 """
 import os
+import re
 import glob
 import time
 import argparse
@@ -41,9 +42,12 @@ def get_args():
     --------------------------------------------------
     调用示例: 
     mjpython Task3_manipulator_bring_ball/show.py --help
-    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.00 --exp_name "v2_exp-01_PPO_r1"
-    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.20 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v2_exp-01_PPO_r1"
-    mjpython Task3_manipulator_bring_ball/show.py --mode video --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "v2_exp-01_PPO_r1" --fps 90    
+    # 最简化示例
+    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.00 --exp_name "v2.1_exp-05_PPO_r5e"
+    # 完整指令示例（演示）
+    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.00 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v2.1_exp-05_PPO_r5e" --choose_model "latest" --match_id 2002944
+    # 完整指令示例（录制）
+    mjpython Task3_manipulator_bring_ball/show.py --mode video --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "v2.1_exp-05_PPO_r5e" --choose_model "latest" --match_id 2002944 --fps 90    
     """
 
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -65,6 +69,10 @@ def get_args():
                         help="运行的总步数")
     parser.add_argument("--exp_name", type=str, 
                         help="(outputs 文件夹中）实验目录名称")
+    parser.add_argument("--choose_model", type=str, default="latest", choices=["best", "latest", "stages"],
+                        help="default='latest', 可选: best; latest; stages, 从outputs/对应目录加载模型和统计数据")
+    parser.add_argument("--match_id", type=str, default=None,
+                        help="default=None, 默认选择 reward 最高的；可选: 指定文件名中的特定标识（如步数 '2002944'）来筛选文件")
     parser.add_argument("--fps", type=int, default=90, 
                         help="渲染/视频帧率")
     
@@ -73,33 +81,46 @@ def get_args():
 def main():
     args = get_args()
     cfg = TrainConfig()
-
-    # 1. 路径配置
     log_dir = os.path.join(cfg.task_dir, "outputs", args.exp_name) 
-    choose_model_dir = os.path.join(log_dir, "latest")  # 可选 "best" "latest" "stages"
+    choose_model_dir = os.path.join(log_dir, args.choose_model)
+    video_folder = os.path.join(log_dir, "videos")
 
-    # 搜索后缀为 .pkl 的文件
-    stats_files = glob.glob(os.path.join(choose_model_dir, "*.pkl"))
-    stats_path = stats_files[0] if stats_files else None
+    # -------- 选择 .zip 与 .pkl 文件 --------
+    zips = glob.glob(os.path.join(choose_model_dir, "*.zip"))
+    pkls = glob.glob(os.path.join(choose_model_dir, "*.pkl"))
 
-    # 搜索后缀为 .zip 的文件
-    model_files = glob.glob(os.path.join(choose_model_dir, "*.zip"))
-    model_path = model_files[0] if model_files else None
+    # ⚠️：非 best 文件夹文件，文件名必须包含 'reward-' 或 match_id
+    # 情况一：best 文件夹，直接取唯一一个
+    if args.choose_model == "best":
+        model_path = zips[0]
+        stats_path = pkls[0]
+    else:
+        # 情况二：根据 match_id 按标识符筛选
+        if args.match_id:
+            target_zips = [f for f in zips if args.match_id in os.path.basename(f)]
+            target_pkls = [f for f in pkls if args.match_id in os.path.basename(f)]
+            model_path = target_zips[0] if target_zips else zips[0]
+            stats_path = target_pkls[0] if target_pkls else pkls[0]
+        else:
+            # 情况三：默认选择最大 reward 的模型：
+            # 按 reward 排序，提取 'reward-' 后的浮点数，从大到小排；这里的正则兼容了负号和浮点数
+            zips.sort(key=lambda x: float(re.findall(r"reward-?(-?\d+\.?\d*)", x)[0] if "reward" in x else -1e9), reverse=True)
+            pkls.sort(key=lambda x: float(re.findall(r"reward-?(-?\d+\.?\d*)", x)[0] if "reward" in x else -1e9), reverse=True)
+            model_path = zips[0]
+            stats_path = pkls[0]
 
     # 打印结果检查
     print(f"找到的统计文件: {stats_path}")
     print(f"找到的模型文件: {model_path}")
 
-    # 容错处理
     if not stats_path or not model_path:
         raise FileNotFoundError(f"在 {choose_model_dir} 中未找到必要的 .pkl 或 .zip 文件")
+    # ----------------
 
-    video_folder = os.path.join(log_dir, "videos")
-
-    # 2. 选择渲染模式
+    # 1. 选择渲染模式 
     render_mode = "human" if args.mode == "human" else "rgb_array"
 
-    # 3. 环境
+    # 2. 环境 配置
     def make_env():
         # 如果 render_mode 是 video 模式，Env 内部会初始化 Renderer
         env = PlanarBringBallEnv(model_path=cfg.xml_path, render_mode=render_mode)
@@ -107,7 +128,7 @@ def main():
 
     venv = DummyVecEnv([make_env])
 
-    # 4. 加载归一化统计数据 (pkl)
+    # 3. 加载归一化统计数据 (pkl)
     if os.path.exists(stats_path):
         print(f"正在加载归一化统计数据: {stats_path}")
         env = VecNormalize.load(stats_path, venv)
@@ -117,16 +138,16 @@ def main():
         print("警告: 未找到 pkl 文件")
         env = venv
 
-    # 5. 设置环境状态 (墙高、位置)
+    # 4. 设置环境状态 (墙高、位置)
     env.env_method("set_wall_height", args.wall)
     if args.ball or args.target:
         env.env_method("set_init_state", ball_xz=args.ball, target_xz=args.target)
 
-    # 6. 加载模型
+    # 5. 加载模型
     print(f"正在加载模型: {model_path}")
     model = PPO.load(model_path, env=env)
 
-    # 7. 运行与收集
+    # 6. 运行与收集
     frames = []
     obs = env.reset()
     print(f"\n>>> 开始运行 [模式: {args.mode}] [墙高: {args.wall}]")
@@ -152,7 +173,7 @@ def main():
                 # 录制模式通常只录一个完整的 Episode
                 obs = env.reset()
 
-        # 8. 导出视频
+        # 7. 导出视频
         if args.mode == "video" and len(frames) > 0:
             os.makedirs(video_folder, exist_ok=True)
             timestamp = time.strftime("%Y%m%d-%H%M%S")
