@@ -64,15 +64,16 @@ import os
 # 应该是安装依赖的时候，conda pip 重复安装了 numpy，这里先跳过报错
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import numpy as np
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocVecEnv
 from stable_baselines3.common.callbacks import EvalCallback, BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import configure
-from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import PPO
 
 from env import PlanarBringBallEnv
 from config import TrainConfig
+
 
 class SyncVecNormalizeCallback(BaseCallback):
     """
@@ -248,11 +249,24 @@ def train():
     DummyVecEnv, VecNormalize组合, 归一化输入
     VecNormalize: 归一化 input, 需配套 .pkl
     """
-    def make_env():
-        env = PlanarBringBallEnv(model_path=cfg.xml_path)
-        env = Monitor(env)
-        return env
-    venv = DummyVecEnv([make_env])
+    def make_env(rank: int, seed: int = 0):
+        """
+        环境工厂函数：为每个进程创建一个独立的环境实例
+        """
+        def _init():
+            env = PlanarBringBallEnv(model_path=cfg.xml_path)
+            # 为每个环境设置不同的随机种子，非常重要！
+            env.reset(seed=seed + rank)
+            env = Monitor(env)
+            return env
+        return _init
+    
+    # 训练阶段：使用 SubprocVecEnv 榨干 CPU（ WSL：12 核心；使用 10 个并行环境）
+    # 评估通常：不需要并行，Dummy 更稳定且方便提取 info
+    # 注意：在 MacOS/Linux 上建议显式指定 start_method
+    # venv = DummyVecEnv([make_env])
+    n_envs = cfg.n_envs  
+    venv = SubprocVecEnv([make_env(i) for i in range(n_envs)], start_method='forkserver')
 
     # 断点续训
     # 注意 None 导致的 TypeError
@@ -265,8 +279,6 @@ def train():
         model = PPO("MlpPolicy", env, 
                     learning_rate=cfg.learning_rate,
                     n_steps=cfg.n_steps,   # 每次训练前采集的总样本量 = n_steps * n_envs
-                    # 减小 n_step：样本多样性下降，可能导致梯度估计不够准确（噪声大）。
-                    # 减小 n_step：计算优势函数 GAE 时能回溯的时间步较短，对于需要长时记忆的任务可能不利。
                     batch_size=cfg.batch_size,
                     verbose=1,
                     tensorboard_log=tb_log_dir)
@@ -283,7 +295,7 @@ def train():
         best 模型（防止过拟合）
         自定义 info
     """
-    eval_venv = DummyVecEnv([make_env])
+    eval_venv = DummyVecEnv([make_env(rank=0)])
     eval_env = VecNormalize(eval_venv, training=False, norm_reward=False)
 
     while stage_idx < total_stages:
@@ -295,9 +307,9 @@ def train():
         if if_save_best:
             print(f"检测到当前为最后阶段 (Stage {stage_idx})，将开启最优模型记录...")
         
+            best_model_dir = best_dir
             b_total_steps = model.num_timesteps
             b_name = f"stage-{stage_idx}_step-{b_total_steps}"
-            best_model_dir = best_dir
             b_stats_filename = f"vec-normalize_{b_name}.pkl"
 
             for file in os.listdir(best_dir):

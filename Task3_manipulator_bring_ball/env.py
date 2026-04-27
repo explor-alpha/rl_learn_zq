@@ -1,32 +1,31 @@
 """
-env.py: 自定义环境 
-    对应任务: 平面机械手抓球——(原型是: DeepMind Control Suite: Manipulator)
-    对应 MuJoCo 的模型实例: "manipulator_bring_ball.xml" 
-        原始xml来源(略微修改): https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml
-        "manipulator_bring_ball.xml"可通过 test_xml.py 展示
-
-    环境支持功能：
+env.py: “机械手平面抓球并跨障送至目标位置“任务 — 自定义 MuJoCo 强化学习环境
+    核心功能：
     1. 实验-不同奖励设计+权重；
     2. 实验-课程学习（通过调整墙的高度）。
-    3. 可视化-通过 show.py 可视化训练结果; 录制视频; 
-    4. reset 逻辑: train 阶段随机初始化球和 target的位置(x, z); show 阶段支持随机位置（默认）和 手动定义固定位置
+    4. `reset`方法：
+        train 阶段，随机初始化球和 target的位置(x, z); 
+        show 阶段，支持随机位置初始化（默认）和 手动定义固定位置
         (已限制随机初始化在墙内；限制随机初始化球在墙的右侧, target 在墙的左侧)
-    
+    3. 可视化-通过 show.py 可视化训练结果; 录制视频; 
     --------------------------------------------------
-    参考 - Train 阶段位置初始化 (世界坐标参考):
-
-    1. 墙体 (Wall):
-    - 位置: 固定在 x = 0.2
-    - 高度: 0.00 ~ 0.30 (wall_height, defined in config.py)
-
-    2. 球 (Ball) 初始范围:
-    - x (随机): [0.25, 0.35] (位于墙右侧)
-    - z: 约为 0.023, 可取0.03 (略高于地面，防止穿透)
-
-    3. 目标 (Target) 初始范围:
-    - tx (随机): [-0.3, -0.2] (位于墙左侧)
-    - tz (随机): [0.05, 0.50] (悬浮或贴地)
+    参考: train 阶段环境参数初始化 (世界坐标):
+        1. 墙体 (Wall):
+        - 位置: 固定在 x = 0.2
+        - 高度: 0.00 ~ 0.30 (wall_height, defined in config.py)
+        2. 球 (Ball) 初始范围:
+        - x (随机): [0.25, 0.35] (位于墙右侧)
+        - z: 约为 0.023, 可取0.03 (略高于地面，防止穿透)
+        3. 目标 (Target) 初始范围:
+        - tx (随机): [-0.3, -0.2] (位于墙左侧)
+        - tz (随机): [0.05, 0.50] (悬浮或贴地)
     --------------------------------------------------
+    PS:
+    - 对应 MuJoCo 的模型实例: "Task3_manipulator_bring_ball/xml/manipulator_bring_ball.xml" 
+    （可通过 mjpython Task3_manipulator_bring_ball/xml/test_xml.py 展示）
+
+    - 任务原型是: DeepMind Control Suite: Manipulator
+    - 原始xml来源(略微修改): https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml
 """
 import gymnasium as gym
 from gymnasium import spaces
@@ -37,29 +36,28 @@ from config import TrainConfig
 
 
 class PlanarBringBallEnv(gym.Env):
-    """自定义 MuJoCo 强化学习环境
-    一个平面机械臂将球带到目标点的
+    """自定义: 具有课程学习功能的 "平面机械臂跨障抓取" MuJoCo 强化学习环境
 
-    该环境模拟了一个具有 5 个执行器的平面机械臂以及一个球。
-    任务是控制机械臂抓取（或推动）一个球，并跨越障碍，将其移动到指定的目标位置。
-
-    PS:
-        self.data: 提供动态状态(关节位置qpos、速度qvel、物体的实时坐标xpos)
-        self.model: 提供静态参数。比如你手动修改的墙高 self.wall_height
-        self.observation_space: 对外部算法(如 PPO)声明规则(如数据范围), 但不填充数据
-           
+    该环境模拟了在垂直平面内移动的 一个 4 自由度的机械臂以及 一个 1 自由度的抓取器，
+    任务是抓取球体并跨越红色障碍墙，最终将其送达目标点。
+    该环境支持动态调整墙高以实现课程学习 (Curriculum Learning)。
+    对应“机械手平面抓球并跨障送至目标位置“任务
+    
     Attributes:
         model: MuJoCo 的模型实例，对应 "manipulator_bring_ball.xml"
+            提供静态参数。比如你手动修改的墙高 self.wall_height
         data: MuJoCo 的数据实例。
+            提供动态状态(关节位置qpos、速度qvel、物体的实时坐标xpos)
         max_steps (int): 每个 episode 的最大步数。
         current_step (int): 当前 episode 已执行的步数。
-        action_space (gym.spaces.Box): 动作空间, 5个电机的控制信号 [-1, 1]。
-        observation_space (gym.spaces.Box): 15维观察空间。
+        action_space (gym.spaces.Box): 5维连续动作空间 (4个臂关节电机 + 1个抓取驱动器),[-1, 1]。
+        observation_space (gym.spaces.Box): 15维连续观察空间。
+            对外部算法(如 PPO)声明规则(如数据范围), 但不填充数据
         wall_height (float): 当前课程学习中的障碍墙高度。
     """
 
     # 仅用于 show.py，不影响 train
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 90}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 100}
 
     def __init__(self, model_path="manipulator_bring_ball.xml", render_mode=None, cfg=TrainConfig()):
         """初始化环境。
@@ -80,12 +78,14 @@ class PlanarBringBallEnv(gym.Env):
         # 观察空间: 15维 (关节pos[4], 关节vel[4], hand_xz[2], ball_xz[2], target_xz[2], wall_h[1])
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(15,), dtype=np.float32)
         
-        # 获取 xml 模型元素的 ID
+        # 获取 xml 模型元素的 ID（缓存，避免在 step 中频繁查询字符串）
         self.wall_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "curriculum_wall")
         self.pinch_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "pinch")
         self.ball_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "ball")
         self.target_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "target_ball")
-        
+        self.target_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "target_ball")
+        self.target_mocap_id = self.model.body_mocapid[self.target_body_id]
+
         # 导入 config
         self.cfg = cfg
         self.max_steps = self.cfg.episode_max_steps  # 单个 episode 最大步数限制
@@ -102,9 +102,6 @@ class PlanarBringBallEnv(gym.Env):
         self.fixed_ball_xz = None
         self.fixed_target_xz = None
 
-        self.target_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "target_ball")
-        self.target_mocap_id = self.model.body_mocapid[self.target_body_id]
-
         # 渲染器初始化，仅用于 show.py，不影响 train
         self.render_mode = render_mode
         self.viewer = None
@@ -112,20 +109,20 @@ class PlanarBringBallEnv(gym.Env):
         if self.render_mode == "rgb_array":
             self.renderer = mujoco.Renderer(self.model)
 
-    def set_wall_height(self, h):
-        """设置环境墙体高度（主要是课程学习接口）。
+    def set_wall_height(self, h: float):
+        """动态修改障碍墙的高度。用于课程学习调度。
 
         修改物理世界的静态参数, 传入 self.model (MjModel)
 
         Args:
-            h: 墙的高度值。
+            h (float): 新的墙体高度（米）。
         """
         self.wall_height = h
         self.model.geom_size[self.wall_geom_id][2] = h / 2.0
         self.model.geom_pos[self.wall_geom_id][2] = h / 2.0
 
     def _get_obs(self):
-        """获取当前环境的观察状态。
+        """从仿真器中提取当前状态并打包为观测向量。
         
         修改环境的实时动态参数, 传入 self.data (MjData)
 
@@ -133,27 +130,31 @@ class PlanarBringBallEnv(gym.Env):
             np.ndarray: 包含关节状态、末端位置、球位置、目标位置和墙高的 15 维数组。
             对应15维观察空间: (关节pos[4], 关节vel[4], hand_xz[2], ball_xz[2], target_xz[2], wall_h[1])
         """
-        hand = self.data.site_xpos[self.pinch_id][[0, 2]]
-        ball = self.data.xpos[self.ball_id][[0, 2]]
-        target = self.data.site_xpos[self.target_id][[0, 2]]
+        hand_pos = self.data.site_xpos[self.pinch_id][[0, 2]]  # 提取 X 和 Z 坐标
+        ball_pos = self.data.xpos[self.ball_id][[0, 2]]
+        target_pos = self.data.site_xpos[self.target_id][[0, 2]]
+        
         return np.concatenate([
-            self.data.qpos[:4], self.data.qvel[:4], 
-            hand, ball, target, [self.wall_height]
-            ]).astype(np.float32)
+            self.data.qpos[:4],      # 4个主关节位置
+            self.data.qvel[:4],      # 4个主关节速度
+            hand_pos,                # 手部末端位置 (2D)
+            ball_pos,                # 球位置 (2D)
+            target_pos,              # 目标位置 (2D)
+            [self.wall_height]       # 任务环境参数
+        ]).astype(np.float32)
 
     def step(self, action):
         """执行环境的一步模拟并计算奖励。
 
-        Step1: 执行一步模拟
         (输入动作 -> 物理引擎模拟(mj_step) -> 获得新状态(obs) -> 计算奖励)
+        Step1: 执行一步模拟
         1. 将动作(action)写入 self.data.ctrl, 这就像给电机的控制信号。
         2. 调用 mujoco.mj_step。物理引擎会计算力、摩擦、碰撞, 并更新 self.data 里的所有位置(xpos)和速度(qvel)。
         3. 获取更新后的观察值(obs)。
-
         Step2: 定义奖励
 
         Args:
-            action: 长度为 5 的动作数组，取值范围 [-1, 1]。
+            action: 神经网络输出的长度为 5 的动作数组，取值范围 [-1, 1]。
 
         Returns:
             tuple: 包含 (obs, reward, terminated, truncated, info)。
@@ -171,21 +172,22 @@ class PlanarBringBallEnv(gym.Env):
         # 逐步引导或者添加算法本身的探索性
         # 另一种方式：参考xxx，clip等等
 
+        # 计算奖励组件
         # 计算欧氏距离：结果是数学纯量（Scalar）
         dist_h2b = np.linalg.norm(self.data.site_xpos[self.pinch_id] - self.data.xpos[self.ball_id])
         dist_b2t = np.linalg.norm(self.data.xpos[self.ball_id] - self.data.site_xpos[self.target_id])
 
-        # reward1(-)：引导手靠近球
+        # R1(-): 趋近奖励（鼓励末端靠近球）
         reward_reach = - self.w_1 * dist_h2b 
 
-        # reward2(+): 引导抓取：如果手离球很近，给一个额外的“鼓励抓取”奖励
+        # R2(+): 引导抓取：如果手离球很近，给一个额外的“鼓励抓取”奖励
         # 可以通过判断两个手指头的位移，或者简单的距离阈值
         reward_grasp = 0
         if dist_h2b < 0.05:
             # 引导 grasp 关节闭合 (假设 action[4] 是抓取)
             reward_grasp = self.w_2 * (1.0 - dist_h2b/0.05)  # 0.5
 
-        # reward3(+): 带球奖励：只有当球离开地面，或者球与手距离极近时，才增加 dist_b2t 的权重
+        # R3(+): 带球奖励：只有当球离开地面，或者球与手距离极近时，才增加 dist_b2t 的权重
         # 否则 Agent 会在还没碰到球时就想去 target，导致姿态扭曲
         reward_bring = 0
         if dist_h2b < 0.03:
@@ -200,7 +202,7 @@ class PlanarBringBallEnv(gym.Env):
             reward -= self.w_gate * dist_to_gate
         """
 
-        # 终止逻辑 & reward_success
+        # 终止逻辑 & R4(+)reward_success
         self.current_step += 1
         terminated = False
         is_success=0
@@ -221,7 +223,7 @@ class PlanarBringBallEnv(gym.Env):
         return obs, reward, terminated, truncated, info
 
     def reset(self, seed: int = None, options: dict = None):
-        """重置环境到初始状态。
+        """重置仿真环境到初始状态。
 
         train 阶段随机初始化球和 target的位置(x, z); 
         show 阶段支持随机位置（默认）和 手动定义固定位置
@@ -276,12 +278,13 @@ class PlanarBringBallEnv(gym.Env):
         mujoco.mj_forward(self.model, self.data)
         return self._get_obs(), {}
 
+    # ------ 以下方法主要用于 show.py 的可视化演示和录制功能，与训练无关 ------
     def set_init_state(self, ball_xz=None, target_xz=None):
-        """手动指定show阶段 球和目标 的初始位置 (x, z)。
+        """手动指定：球和目标的初始位置 (x, z)。
 
         仅用于 show.py, 和训练无关
-        如果在 reset 之前调用，则 reset 会使用这些值
-        注意是世界坐标
+        指定的 (x, z)为世界坐标
+        需在 reset 之前调用，则 reset 会使用这些值
 
         Args:
             ball_xz: 球的世界坐标 [x, z]，例如 [0.3, 0.0]
@@ -298,7 +301,16 @@ class PlanarBringBallEnv(gym.Env):
         if self.render_mode == "human":
             if self.viewer is None:
                 self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
+                
+                # --- 设置自由视角的初始默认位置（参数通过 xml/test_xml.py 自动获取） ---
+                self.viewer.cam.lookat = [0.070, 0.009, 0.492]    # 相机盯着这个点看
+                self.viewer.cam.distance = 2.761            # 视角距离焦点的距离（越大画面越小）
+                self.viewer.cam.azimuth = 96.373            # 90度表示从正侧面（Y轴方向）看过去
+                self.viewer.cam.elevation = -3.769          # 负值表示向下俯视
+                # -----------------------------------
+
             self.viewer.sync()
+
         elif self.render_mode == "rgb_array":
             if self.renderer is None:
                 self.renderer = mujoco.Renderer(self.model, height=1440, width=2560)

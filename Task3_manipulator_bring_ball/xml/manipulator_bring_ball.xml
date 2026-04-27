@@ -1,4 +1,4 @@
-<!-- xml来源：https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml -->
+<!-- 原始xml来源：https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml -->
 <mujoco model="planar manipulator - bring ball">
 
   <include file="./visual.xml"/>
@@ -14,7 +14,9 @@
     <quality shadowsize="2048"/>
   </visual>
 
-  <option timestep="0.001" cone="elliptic"/>
+  <!-- 一次 mj_step = 现实中的 0.01 秒，与电脑运行速度无关 -->
+  <!-- 原 xml 设置 0.001 -->
+  <option timestep="0.01" cone="elliptic"/>
 
   <default>
     <geom friction=".7" solimp="0.9 0.97 0.001" solref=".005 1"/>
@@ -64,8 +66,12 @@
     <geom name="wall1_collider" type="box" pos="-.7394115 0 .2262745" size="5 .2 .08" quat="0.9238795 0 0.3826834 0" contype="1" conaffinity="1" rgba="0 0 0 0.001"/>
     <geom name="wall2_collider" type="box" pos=".7394115 0 .2262745" size="5 .2 .08" quat="0.9238795 0 -0.3826834 0" contype="1" conaffinity="1" rgba="0 0 0 0.001"/>
     <geom name="background" type="plane" pos="0 .2 .5" size="1 .5 10" material="background" zaxis="0 -1 0" contype="0" conaffinity="0"/>
-    <camera name="fixed" pos="0 -1 .4" xyaxes="1 0 0 0 0 1" fovy="70"/>
-    <!-- 修改camera "fixed" 的 pos-->
+    <camera name="fixed" pos="0.000 -1.300 0.514" xyaxes="1.000 0.000 0.000 0.000 0.000 1.000" fovy="60"/>
+    <!--
+    pos: 相机位置
+    xyaxes: 相机坐标系定义，用于微调相机的朝向
+    fovy: 较大的 fovy 会提供更广的视野，但可能会引入更多的透视畸变；
+    -->
 
     <!-- 在 <worldbody> 内部添加 -->
     <!-- 初始高度设为很低（比如 0.02），位置在机械臂(0)和球(0.4)中间 -->

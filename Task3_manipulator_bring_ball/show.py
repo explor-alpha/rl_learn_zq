@@ -1,10 +1,18 @@
 """
-show.py: 平面机械手抓球任务—演示与录制脚本
-    支持功能：
-    1. 基础功能：演示和录制训练结果
-    2. Key-泛化性测试，即，测试 train 时没见过的 env 初始状态,
-        获取 train 阶段环境参数: mjpython Task3_manipulator_bring_ball/show.py --help
-        演示示例: mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "exp-00_PPO_debug_test011" --fps 90    
+show.py: “机械手平面抓球并跨障送至目标位置“任务 — 训练结果(`outputs/`)演示与录制脚本
+    核心功能：
+    1. 基础功能：
+        1. 实时渲染演示训练结果(`outputs/`)：（默认）
+        2. 录制视频：通过 `--mode video` 参数，支持录制视频并保存到对应实验目录的 `videos/` 文件夹中；
+    2. 模型选择：
+        - 示例: `--exp_name "v2.1_exp-05_PPO_r5e" --choose_model "latest" --match_id 2002944`
+        - `--exp_name` 参数：指定了实验目录名称（必须手动传入）
+        - `--choose_model` 参数：选择展示对应实验目录下 best、latest、stages 三种结果；
+        - `--match_id` 参数：可指定文件名中的特定标识（如步数 '2002944'）来筛选文件；如果不指定，则默认选择 reward 最高的模型；
+    3. 泛化性测试：
+        step1: 获取 train 阶段环境参数: mjpython Task3_manipulator_bring_ball/show.py --help
+        step2: 测试 train 时没见过的 env 初始状态
+        演示示例: mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.02 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v2.1_exp-05_PPO_r5e"
 """
 import os
 import re
@@ -13,7 +21,6 @@ import time
 import argparse
 import numpy as np
 import imageio
-
 # 屏蔽一些不必要的警告
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -24,30 +31,31 @@ from config import TrainConfig
 
 def get_args():
     description = """
-    平面机械手抓球任务—演示与录制脚本
+    “机械手平面抓球并跨障送至目标位置“任务 — 训练结果(outputs/)演示与录制脚本
     --------------------------------------------------
-    参考 - Train 阶段位置初始化 (世界坐标参考):
-
-    1. 墙体 (Wall):
-    - 位置: 固定在 x = 0.2
-    - 高度: 0.00 ~ 0.30 (wall_height, defined in config.py)
-
-    2. 球 (Ball) 初始范围:
-    - x (随机): [0.25, 0.35] (位于墙右侧)
-    - z: 约为 0.023, 可取0.03 (略高于地面，防止穿透)
-
-    3. 目标 (Target) 初始范围:
-    - tx (随机): [-0.3, -0.2] (位于墙左侧)
-    - tz (随机): [0.05, 0.50] (悬浮或贴地)
+    泛化性测试:
+    参考: train 阶段环境参数初始化 (世界坐标):
+        1. 墙体 (Wall):
+        - 位置: 固定在 x = 0.2
+        - 高度: 0.00 ~ 0.30 (wall_height, defined in config.py)
+        2. 球 (Ball) 初始范围:
+        - x (随机): [0.25, 0.35] (位于墙右侧)
+        - z: 约为 0.023, 可取0.03 (略高于地面，防止穿透)
+        3. 目标 (Target) 初始范围:
+        - tx (随机): [-0.3, -0.2] (位于墙左侧)
+        - tz (随机): [0.05, 0.50] (悬浮或贴地)
+    通过调整 --wall, --ball, --target 参数，可以测试模型在训练时未见过的环境初始状态下的表现，验证泛化能力。
     --------------------------------------------------
     调用示例: 
+    # 获取帮助信息
     mjpython Task3_manipulator_bring_ball/show.py --help
     # 最简化示例
-    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.00 --exp_name "v2.1_exp-05_PPO_r5e"
+    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v2.1_exp-05_PPO_r5e"
+    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v2.1_exp-05_PPO_r5e" --mode video 
     # 完整指令示例（演示）
-    mjpython Task3_manipulator_bring_ball/show.py --mode human --wall 0.00 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v2.1_exp-05_PPO_r5e" --choose_model "latest" --match_id 2002944
-    # 完整指令示例（录制）
-    mjpython Task3_manipulator_bring_ball/show.py --mode video --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --steps 1000 --exp_name "v2.1_exp-05_PPO_r5e" --choose_model "latest" --match_id 2002944 --fps 90    
+    mjpython Task3_manipulator_bring_ball/show.py --wall 0.00 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v2.1_exp-05_PPO_r5e" --choose_model "latest" --match_id 2002944
+    # 完整指令示例（录制） 
+    mjpython Task3_manipulator_bring_ball/show.py --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v2.1_exp-05_PPO_r5e" --choose_model "latest" --match_id 2002944 --mode video -fps 100
     """
 
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -57,7 +65,7 @@ def get_args():
                         help="运行模式: human (实时渲染) 或 video (录制)")
     
     # 环境控制参数
-    parser.add_argument("--wall", type=float, default=0.30, 
+    parser.add_argument("--wall", type=float, default=0.02, 
                         help="设置墙的高度 (课程学习)")
     parser.add_argument("--ball", type=float, nargs=2, metavar=('X', 'Z'), 
                         help="手动指定球的初始位置; (例如: --ball 0.30 0.03)")
@@ -73,8 +81,8 @@ def get_args():
                         help="default='latest', 可选: best; latest; stages, 从outputs/对应目录加载模型和统计数据")
     parser.add_argument("--match_id", type=str, default=None,
                         help="default=None, 默认选择 reward 最高的；可选: 指定文件名中的特定标识（如步数 '2002944'）来筛选文件")
-    parser.add_argument("--fps", type=int, default=90, 
-                        help="渲染/视频帧率")
+    parser.add_argument("--fps", type=int, default=100, 
+                        help="渲染/视频帧率，仿真环境的默认步长为 0.01s, 理论上最大帧率为 100fps; 可以适当调整以平衡预览速度和视频流畅度")
     
     return parser.parse_args()
 
@@ -115,39 +123,30 @@ def main():
 
     if not stats_path or not model_path:
         raise FileNotFoundError(f"在 {choose_model_dir} 中未找到必要的 .pkl 或 .zip 文件")
-    # ----------------
 
+    # -------- main --------
     # 1. 选择渲染模式 
     render_mode = "human" if args.mode == "human" else "rgb_array"
 
-    # 2. 环境 配置
+    # 2. 环境配置
     def make_env():
         # 如果 render_mode 是 video 模式，Env 内部会初始化 Renderer
         env = PlanarBringBallEnv(model_path=cfg.xml_path, render_mode=render_mode)
         return env
 
     venv = DummyVecEnv([make_env])
+    env = VecNormalize.load(stats_path, venv)
+    env.training = False 
+    env.norm_reward = False 
 
-    # 3. 加载归一化统计数据 (pkl)
-    if os.path.exists(stats_path):
-        print(f"正在加载归一化统计数据: {stats_path}")
-        env = VecNormalize.load(stats_path, venv)
-        env.training = False 
-        env.norm_reward = False 
-    else:
-        print("警告: 未找到 pkl 文件")
-        env = venv
-
-    # 4. 设置环境状态 (墙高、位置)
     env.env_method("set_wall_height", args.wall)
     if args.ball or args.target:
         env.env_method("set_init_state", ball_xz=args.ball, target_xz=args.target)
 
-    # 5. 加载模型
-    print(f"正在加载模型: {model_path}")
+    # 3. 加载模型
     model = PPO.load(model_path, env=env)
 
-    # 6. 运行与收集
+    # 4. 开始渲染：模式 = human (实时渲染) 或 video (录制视频)
     frames = []
     obs = env.reset()
     print(f"\n>>> 开始运行 [模式: {args.mode}] [墙高: {args.wall}]")
@@ -173,7 +172,7 @@ def main():
                 # 录制模式通常只录一个完整的 Episode
                 obs = env.reset()
 
-        # 7. 导出视频
+        # 5. 导出视频
         if args.mode == "video" and len(frames) > 0:
             os.makedirs(video_folder, exist_ok=True)
             timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -190,7 +189,6 @@ def main():
                 output_params=['-crf', '10', '-preset', 'veryslow'] 
             )
             print(f"✅ 视频已保存至: {video_path}")
-
 
     except KeyboardInterrupt:
         print("\n用户中断")
