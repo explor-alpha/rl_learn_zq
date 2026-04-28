@@ -32,8 +32,20 @@ from gymnasium import spaces
 import mujoco
 import mujoco.viewer
 import numpy as np
-from config import TrainConfig
 
+from config import TrainConfig
+from tolerance import tolerance
+
+
+def _tolerance(
+    x: np.ndarray,
+    *,  # 限制后面的参数必须是 keyword-only
+    bounds: tuple[float, float] = (0.0, 0.0),
+    margin: float = 0.0,
+    sigmoid: str = "gaussian",
+    value_at_margin: float = 0.1,
+) -> np.ndarray:
+    return tolerance(x, bounds=bounds, margin=margin, sigmoid=sigmoid, value_at_margin=value_at_margin)
 
 class PlanarBringBallEnv(gym.Env):
     """自定义: 具有课程学习功能的 "平面机械臂跨障抓取" MuJoCo 强化学习环境
@@ -172,21 +184,48 @@ class PlanarBringBallEnv(gym.Env):
         # 逐步引导或者添加算法本身的探索性
         # 另一种方式：参考xxx，clip等等
 
-        # 计算奖励组件
-        # 计算欧氏距离：结果是数学纯量（Scalar）
-        dist_h2b = np.linalg.norm(self.data.site_xpos[self.pinch_id] - self.data.xpos[self.ball_id])
-        dist_b2t = np.linalg.norm(self.data.xpos[self.ball_id] - self.data.site_xpos[self.target_id])
+        # 计算奖励组件，提取关键物理量（世界坐标下的 XZ 距离）
+        hand_pos = self.data.site_xpos[self.pinch_id]
+        ball_pos = self.data.xpos[self.ball_id]
+        target_pos = self.data.site_xpos[self.target_id]
 
+        dist_h2b = np.linalg.norm(hand_pos - ball_pos)  # 手到球的距离
+        dist_b2t = np.linalg.norm(ball_pos - target_pos) # 球到目标的距离
+
+        # R1: 趋近奖励 (Reach)
+        # 解释：进入球半径范围 2.2cm 获得满分 1.0；在 50cm 范围内有平滑引导梯度
+        reward_reach = _tolerance(dist_h2b, bounds=(0, 0.022), margin=0.5, sigmoid='long_tail')
+
+        # R2: 抓取引导奖励 (Grasp)
+        # 逻辑：只有当手离球足够近（< 0.03m）时，才奖励“闭合抓取器”的动作
+        # action[4] > 0 表示闭合。我们在 [0.8, 1.0] 范围内给满分。
+        reward_grasp = 0.0
+        if dist_h2b < 0.03:
+            reward_grasp = _tolerance(action[4], bounds=(0.8, 1.0), margin=0.5, sigmoid='linear')
+
+        # R3: 带球奖励 (Bring)
+        # 逻辑关键：只有当手离球很近（暗示球被控制住）时，才激活此奖励。
+        # 否则 Agent 会在还没抓到球时就想去目标点，导致姿态扭曲。
+        reward_bring = 0.0
+        if dist_h2b < 0.03:
+            # 目标距离核心区设为 5cm，缓冲区设为 80cm（覆盖整个工作空间）
+            reward_bring = _tolerance(dist_b2t, bounds=(0, 0.05), margin=0.8, sigmoid='long_tail')
+
+        # 最终奖励加权汇总
+        # 总奖励理论上限约为 1.0(reach) + 0.5(grasp) + 2.0(bring) = 3.5
+        reward = (self.w_1 * reward_reach + 
+                  self.w_2 * reward_grasp + 
+                  self.w_3 * reward_bring)
+        
+        """
         # R1(-): 趋近奖励（鼓励末端靠近球）
         reward_reach = - self.w_1 * dist_h2b 
-
         # R2(+): 引导抓取：如果手离球很近，给一个额外的“鼓励抓取”奖励
         # 可以通过判断两个手指头的位移，或者简单的距离阈值
         reward_grasp = 0
         if dist_h2b < 0.05:
             # 引导 grasp 关节闭合 (假设 action[4] 是抓取)
             reward_grasp = self.w_2 * (1.0 - dist_h2b/0.05)  # 0.5
-
         # R3(+): 带球奖励：只有当球离开地面，或者球与手距离极近时，才增加 dist_b2t 的权重
         # 否则 Agent 会在还没碰到球时就想去 target，导致姿态扭曲
         reward_bring = 0
@@ -194,6 +233,7 @@ class PlanarBringBallEnv(gym.Env):
             reward_bring = 2.0 - (self.w_3 * dist_b2t)  # 2
 
         reward = reward_reach + reward_grasp + reward_bring
+        """
 
         """
         # 绕路引导
@@ -206,6 +246,7 @@ class PlanarBringBallEnv(gym.Env):
         self.current_step += 1
         terminated = False
         is_success=0
+
         if dist_b2t < self.success_threshold:
             reward += self.w_success # 给予一笔“终点奖金”
             terminated = True
@@ -213,14 +254,17 @@ class PlanarBringBallEnv(gym.Env):
             
         truncated = self.current_step >= self.max_steps
 
-        # 组装 info
+        # 组装 info 监控
         info = {
             "is_success": is_success,
             "dist_b2t": dist_b2t,
-            "dist_h2b": dist_h2b
+            "dist_h2b": dist_h2b,
+            "r_reach": reward_reach,
+            "r_bring": reward_bring
         }
 
-        return obs, reward, terminated, truncated, info
+        # 确保返回的是 Python float 而不是 numpy array
+        return obs, float(reward), terminated, truncated, info
 
     def reset(self, seed: int = None, options: dict = None):
         """重置仿真环境到初始状态。
