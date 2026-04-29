@@ -1,4 +1,49 @@
-<!-- 原始xml来源：https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml -->
+<!--
+原始xml来源：https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml
+
+对原始 xml 进行以下微调：
+1. 在<worldbody>内部添加用于课程学习的 Wall
+2. 修改 timestep="0.01"
+3. (可选) 修改“fixed”相机位置和视野
+
+xml 解读:
+1. 通过下列两点可以判断本 xml 对应的任务是平面任务
+    1. arm 定义中: hinge：所有转动关节都绕着 Y 轴（axis=0 -1 0）转动
+    2. ball定义中: slide：沿 x,z 轴滑动；hinge：绕 y 轴旋转；没有沿 y 轴的 slide 关节，说明球在平面内移动
+2. xml 的不同组件：
+    1. Geom ID: 几何外观，如墙高
+    2. SITE ID: 标记点世界坐标,计算目标距离；data.site_xpos[site_id]，调用 site（标记点）的世界坐标
+    3. Body ID: 质量、惯性、质心世界坐标；data.body_xpos[body_id]调用 body 的质心世界坐标
+    4. Joint ID: 关节位置、速度等状态信息；通过 self.model.jnt_range[joint_id] 获取关节的动作范围
+    - env.py 中自定义 _init_ids，缓存关节 id
+3. 搜索整个文档的 site 标记点：
+    1. 在 <body name="hand" pos="0 0 .12"> 分支中   # 手掌
+      1. <site name="palm_touch" type="box" pos="0 0 .043" size=".025 .005 .008"/>  # 相对于 hand z 轴向前.043，是个 box(有体积的区域)；用来检测物体有没有贴在掌心 # || object_pos - palm_touch || 判断是否贴掌
+      2. <site name="grasp" pos="0 0 .065"/>       # 相对于 hand z 轴向前.065，用来代表整只手掌的位置 # || object_pos - grasp || 判断是否“包住”
+      3. <body name="pinch site" pos="0 0 .090">   # 相对于 hand z 轴向前.090，两个指尖“闭合后会碰到”的那个点，用于“夹取逻辑“ # distance = || object_pos - pinch || 对齐物体
+            <site name="pinch"/>
+          </body>
+      可见上述 3 个 site 标记点都在一条直线上！“手的抓取轴（approach axis）”
+    2. 同样在 <body name="hand" pos="0 0 .12"> 分支中   # 手掌
+      1. <body name="thumb" pos=".03 0 .045" euler="0 -90 0" childclass="hand">
+          <site name="thumb_touch" group="4"/>
+          <body name="thumbtip" pos=".05 0 -.01" childclass="fingertip">
+            <site  name="thumbtip_touch" group="4"/>   # 拇指尖；用于真正的夹取逻辑
+      2.  同样的定义了 <site name="fingertip_touch"/>    # 食指尖
+    3. 对于 ball 来说，body 内部定义的 site 没有设置偏移，故通过 site 和 body 获取的世界坐标都是质心位置
+4. mocap="true" 设置 target 虚拟点
+
+xml 和 env.py 的交互：
+    - 导入和变量储存：
+      - self.model (MjModel)—静态参数 (如 self.wall_height)
+      - self.data (MjData)—动态参数 (如 self.data.qpos, self.data.xpos)
+    - env.py 中自定义 _init_ids，缓存关节 id
+      - 静态，对应 self.model
+      - 对应 xml 的不同组件：BODY(质量、惯性和整体位置)、GEOM(几何外观，如墙高)、JOINT、SITE(标记点,计算目标距离) 等
+    - 在 xml 中添加新的 site 或 geom，并在 env.py 中通过 self.data.site_xpos 或 self.data.xpos 获取它们的位置。
+    - 例如，添加一个名为 "curriculum_wall" 的 geom，在 env.py 中可以通过 self.data.geom_xpos[self.wall_id] 获取它的位置。
+    - 这些信息可以用于设计奖励函数，例如根据机械臂与墙的距离调整奖励，或者在训练过程中逐渐提高墙的高度。
+-->
 <mujoco model="planar manipulator - bring ball">
 
   <include file="./visual.xml"/>
@@ -16,7 +61,8 @@
 
   <!-- 一次 mj_step = 现实中的 0.01 秒，与电脑运行速度无关 -->
   <!-- 原 xml 设置 0.001 -->
-  <option timestep="0.01" cone="elliptic"/>
+  <!-- 通过 self.model.opt.timestep 修改 -->
+  <option timestep="0.001" cone="elliptic"/>
 
   <default>
     <geom friction=".7" solimp="0.9 0.97 0.001" solref=".005 1"/>
@@ -27,6 +73,7 @@
 
     <default class="arm">
       <geom type="capsule" material="self" density="500"/>
+      <!-- hinge：所有转动关节都绕着 Y 轴（axis=0 -1 0）转动 -->
       <joint type="hinge" pos="0 0 0" axis="0 -1 0" limited="true"/>
       <default class="hand">
         <joint damping=".5" range="-10 60"/>
@@ -67,13 +114,12 @@
     <geom name="wall2_collider" type="box" pos=".7394115 0 .2262745" size="5 .2 .08" quat="0.9238795 0 -0.3826834 0" contype="1" conaffinity="1" rgba="0 0 0 0.001"/>
     <geom name="background" type="plane" pos="0 .2 .5" size="1 .5 10" material="background" zaxis="0 -1 0" contype="0" conaffinity="0"/>
     <camera name="fixed" pos="0.000 -1.300 0.514" xyaxes="1.000 0.000 0.000 0.000 0.000 1.000" fovy="60"/>
-    <!--
-    pos: 相机位置
+    <!-- "fixed"相机位置：
     xyaxes: 相机坐标系定义，用于微调相机的朝向
     fovy: 较大的 fovy 会提供更广的视野，但可能会引入更多的透视畸变；
     -->
 
-    <!-- 在 <worldbody> 内部添加 -->
+    <!-- Wall(curriculum) -->
     <!-- 初始高度设为很低（比如 0.02），位置在机械臂(0)和球(0.4)中间 -->
     <geom name="curriculum_wall" 
           type="box" 
@@ -140,6 +186,7 @@
     </body>
 
     <!-- prop: ball -->
+    <!-- slide：沿 x,z 轴滑动；hinge：绕 y 轴旋转；没有沿 y 轴的 slide 关节，说明球在平面内移动 -->
     <body name="ball" pos=".4 0 .4" childclass="object">
       <joint name="ball_x" type="slide" axis="1 0 0" ref=".4"/>
       <joint name="ball_z" type="slide" axis="0 0 1" ref=".4"/>
@@ -149,6 +196,7 @@
     </body>
 
     <!-- target -->
+    <!-- mocap="true"：虚拟点；不会受重力掉落，不参与物理碰撞（除非特殊设置），仅作为视觉和奖励参考 -->
     <body name="target_ball" pos=".4 .001 .4" mocap="true" childclass="ghost">
       <geom  name="target_ball" type="sphere" size=".02" />
       <site  name="target_ball" type="sphere"/>

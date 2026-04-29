@@ -50,10 +50,10 @@ def get_args():
     # 获取帮助信息
     mjpython Task3_manipulator_bring_ball/show.py --help
     # 最简化示例
-    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v3.1_exp-01_PPO_r2"
+    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v4_exp-10_PPO_r4" --choose_model "latest" --match_id 23.94
     mjpython Task3_manipulator_bring_ball/show.py --exp_name "v2.1_exp-05_PPO_r5e" --mode video 
     # 完整指令示例（演示）
-    mjpython Task3_manipulator_bring_ball/show.py --wall 0.00 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v3.1_exp-01_PPO_r2" --choose_model "latest" --match_id 20316
+    mjpython Task3_manipulator_bring_ball/show.py --wall 0.00 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v4_exp-03_PPO_r4" --choose_model "latest" --match_id 23.94
     # 完整指令示例（录制） 
     mjpython Task3_manipulator_bring_ball/show.py --wall 0.30 --ball 0.30 0.03 --target -0.25 0.4 --exp_name "v2.1_exp-05_PPO_r5e" --choose_model "latest" --match_id 2002944 --mode video -fps 100
     """

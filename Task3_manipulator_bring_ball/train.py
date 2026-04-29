@@ -275,7 +275,7 @@ def train():
         model = PPO.load(goon_model_path, env=env)
     else:
         print(f"未检测到存档，开始全新训练...")
-        env = VecNormalize(venv, norm_obs=True, norm_reward=True, clip_obs=10.)
+        env = VecNormalize(venv, norm_obs=True, norm_reward=False, clip_obs=10.)
         model = PPO("MlpPolicy", env, 
                     learning_rate=cfg.learning_rate,
                     n_steps=cfg.n_steps,   # 每次训练前采集的总样本量 = n_steps * n_envs

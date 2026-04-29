@@ -3,8 +3,8 @@
 ```python
 # env.py reward
         # 计算欧氏距离：结果是数学纯量（Scalar）
-        dist_h2b = np.linalg.norm(self.data.site_xpos[self.pinch_id] - self.data.xpos[self.ball_id])
-        dist_b2t = np.linalg.norm(self.data.xpos[self.ball_id] - self.data.site_xpos[self.target_id])
+        dist_h2b = np.linalg.norm(self.data.site_xpos[self.pinch_id] - self.data.xpos[self.ball_body_id])
+        dist_b2t = np.linalg.norm(self.data.xpos[self.ball_body_id] - self.data.site_xpos[self.target_id])
 
         # reward1(-)：引导手靠近球
         reward_reach = - self.w_1 * dist_h2b 

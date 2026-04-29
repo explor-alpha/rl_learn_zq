@@ -44,8 +44,10 @@ def _tolerance(
     margin: float = 0.0,
     sigmoid: str = "gaussian",
     value_at_margin: float = 0.1,
-) -> np.ndarray:
+    ) -> np.ndarray:
+    """计算 tolerance 奖励。"""
     return tolerance(x, bounds=bounds, margin=margin, sigmoid=sigmoid, value_at_margin=value_at_margin)
+
 
 class PlanarBringBallEnv(gym.Env):
     """自定义: 具有课程学习功能的 "平面机械臂跨障抓取" MuJoCo 强化学习环境
@@ -57,14 +59,11 @@ class PlanarBringBallEnv(gym.Env):
     
     Attributes:
         model: MuJoCo 的模型实例，对应 "manipulator_bring_ball.xml"
-            提供静态参数。比如你手动修改的墙高 self.wall_height
         data: MuJoCo 的数据实例。
-            提供动态状态(关节位置qpos、速度qvel、物体的实时坐标xpos)
         max_steps (int): 每个 episode 的最大步数。
         current_step (int): 当前 episode 已执行的步数。
         action_space (gym.spaces.Box): 5维连续动作空间 (4个臂关节电机 + 1个抓取驱动器),[-1, 1]。
         observation_space (gym.spaces.Box): 15维连续观察空间。
-            对外部算法(如 PPO)声明规则(如数据范围), 但不填充数据
         wall_height (float): 当前课程学习中的障碍墙高度。
     """
 
@@ -84,47 +83,116 @@ class PlanarBringBallEnv(gym.Env):
         self.model = mujoco.MjModel.from_xml_path(model_path)
         self.data = mujoco.MjData(self.model)
 
-        # 动作空间: 5个电机 (root, shoulder, elbow, wrist, grasp)，一般限制在 [-1,1]
+        # 和 xml 交互; 获取 xml 模型元素的 ID（缓存，避免在 step 中频繁查询字符串）
+        self._init_ids()
+
+        # 定义仿真时间
+        self._init_time()
+
+        # Action Space: 
+        # 4个机械臂关节 + 1个抓取指令，范围 [-1, 1]
+        # 定义：shape == xml 中的 actuator 数量和顺序（root, shoulder, elbow, wrist, grasp） == PPO 的 action_dim = 5
+        # 定义：动作一般限制在 [-1, 1]
+        # 交互：PPO-Policy Network 输出 action -> step()接收，将 action 写入 self.data.ctrl -> 物理引擎根据 ctrl 计算力、摩擦、碰撞等 -> 更新 self.data 中的位置(xpos)和速度(qvel)等状态变量
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(5,), dtype=np.float32)
         
-        # 观察空间: 15维 (关节pos[4], 关节vel[4], hand_xz[2], ball_xz[2], target_xz[2], wall_h[1])
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(15,), dtype=np.float32)
-        
-        # 获取 xml 模型元素的 ID（缓存，避免在 step 中频繁查询字符串）
-        self.wall_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "curriculum_wall")
-        self.pinch_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "pinch")
-        self.ball_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "ball")
-        self.target_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "target_ball")
-        self.target_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "target_ball")
-        self.target_mocap_id = self.model.body_mocapid[self.target_body_id]
+        # Observation Space: 
+        # 18维
+        # 定义：由 _get_obs 定义
+        # 此处只是对外部算法(如 PPO)声明规则(如数据范围), 但不填充数据
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(18,), dtype=np.float32)
 
-        # 导入 config
-        self.cfg = cfg
-        self.max_steps = self.cfg.episode_max_steps  # 单个 episode 最大步数限制
-        self.success_threshold = self.cfg.success_threshold
-
-        self.w_1 = self.cfg.reward_weight_1  # reward 权重
-        self.w_2 = self.cfg.reward_weight_2
-        self.w_3 = self.cfg.reward_weight_3
-        self.w_success = self.cfg.reward_weight_success
-
-        # 状态变量
+        # 初始化，状态变量
         self.current_step = 0
         self.wall_height = 0.0
+
+        # ----- 和 config.py 交互 -----
+        self.cfg = cfg
+        self.max_steps = self.cfg.episode_max_steps  # 单个 episode 最大步数限制
+        self.lift_threshold = self.cfg.success_lift_threshold_height
+        self.success_threshold = self.cfg.success_threshold
+
+        # ----- 仅用于 show.py 渲染和泛化性测试，和 train 无关 -----
+        # 在 show.py 中，选择固定位置参数
         self.fixed_ball_xz = None
         self.fixed_target_xz = None
 
-        # 渲染器初始化，仅用于 show.py，不影响 train
+        # 渲染器初始化
         self.render_mode = render_mode
         self.viewer = None
         self.renderer = None
         if self.render_mode == "rgb_array":
             self.renderer = mujoco.Renderer(self.model)
 
+    def _init_time(self):
+        """初始化仿真时间相关变量。
+        
+        [TODO]: 放到 config.py
+        """
+        self.model.opt.timestep = 0.002   # physics dt（修改 xml）
+        self.sim_dt = self.model.opt.timestep
+        self.ctrl_dt = 0.01               # control dt（机器人）
+
+        # 需确保 sim_dt 能被 ctrl_dt 整除，否则报错
+        ratio = self.ctrl_dt / self.sim_dt
+        if abs(ratio - round(ratio)) > 1e-8:
+            raise ValueError("ctrl_dt must be divisible by sim_dt")
+        self.sim_substeps = int(round(ratio))
+
+    def _init_ids(self):
+        """获取 xml 模型元素的 ID，并缓存，避免在 step 中频繁查询字符串
+        
+        调用时机：内部函数，必须在环境初始化时调用
+        和 xml 交互：传入 self.model (MjModel)—修改物理世界的静态参数
+            1. Geom ID: 几何外观，如墙高
+            2. SITE ID: 标记点世界坐标,计算目标距离；data.site_xpos[site_id]，调用 site（标记点）的世界坐标
+            3. Body ID: 质量、惯性、质心世界坐标；data.body_xpos[body_id]调用 body 的质心世界坐标
+            4. Joint ID: 关节位置、速度等状态信息；通过 self.model.jnt_range[joint_id] 获取关节的动作范围
+        """
+        # Geom ID: 几何外观，如墙高
+        self.wall_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "curriculum_wall")
+
+        # SITE ID: 标记点世界坐标,计算目标距离；
+        # data.site_xpos[site_id]，调用 site（标记点）的世界坐标
+        self.palm_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "palm_touch")  # box 类型标记；判断是否贴掌  # 相对于 hand z 轴向前.043
+        self.grasp_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "grasp")  # 判断是否“包住”  # 相对于 hand z 轴向前.065
+        self.pinch_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "pinch")  # 对齐物体  # 相对于 hand z 轴向前.090
+        self.fingertip_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "fingertip_touch")  # 食指尖标记
+        self.thumbtip_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "thumbtip_touch")  # 拇指尖标记
+
+        # Body ID: 质量、惯性、质心世界坐标；
+        # data.body_xpos[body_id]调用 body 的质心世界坐标
+        self.ball_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "ball")
+        
+        # mocap ID
+        # target_body_id   = 观测目标位置（用于 reward）
+        # target_mocap_id  = 控制目标位置（用于 reset / random goal)
+        self.target_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "target_ball")
+        self.target_mocap_id = self.model.body_mocapid[self.target_body_id]
+
+        # --- 新增：关节在 qvel 中的索引 ---
+        arm_joint_names = ["arm_root", "arm_shoulder", "arm_elbow", "arm_wrist"]
+        # 获取这4个关节在 qvel 向量中的起始地址
+        self.arm_qvel_indices = [self.model.joint(name).dofadr[0] for name in arm_joint_names]
+
+        # --- 新增：手部所有 Geom ID (用于碰撞检测) ---
+        hand_geom_names = ["hand", "palm1", "palm2", "thumb1", "thumb2", "thumbtip1", "thumbtip2", 
+                           "finger1", "finger2", "fingertip1", "fingertip2"]
+        self.hand_geom_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, name) for name in hand_geom_names]
+        self.ball_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "ball")
+
+        # --- 新增：触觉传感器在 sensordata 中的地址 ---
+        self.sensor_adr_palm = self.model.sensor("palm_touch").adr[0]
+        self.sensor_adr_fingertip = self.model.sensor("fingertip_touch").adr[0]
+        self.sensor_adr_thumbtip = self.model.sensor("thumbtip_touch").adr[0]
+
     def set_wall_height(self, h: float):
         """动态修改障碍墙的高度。用于课程学习调度。
 
-        修改物理世界的静态参数, 传入 self.model (MjModel)
+        调用时机：在 train.py 中通过 env.env_method("set_wall_height", stage['wall_height'])调用
+        和 xml 交互：传入 self.model (MjModel)—修改物理世界的静态参数
+            self.model.geom_size: 修改墙的尺寸（高度的一半，因为 size 定义为半尺寸）
+            self.model.geom_pos: 修改墙的位置（z 轴位置为高度的一半，使其底部贴地）
 
         Args:
             h (float): 新的墙体高度（米）。
@@ -136,24 +204,44 @@ class PlanarBringBallEnv(gym.Env):
     def _get_obs(self):
         """从仿真器中提取当前状态并打包为观测向量。
         
+        定义: self.observation_space
         修改环境的实时动态参数, 传入 self.data (MjData)
 
         Returns:
-            np.ndarray: 包含关节状态、末端位置、球位置、目标位置和墙高的 15 维数组。
-            对应15维观察空间: (关节pos[4], 关节vel[4], hand_xz[2], ball_xz[2], target_xz[2], wall_h[1])
+            np.ndarray: 18 维数组，包含：
+                - 关节位置 (4): arm_root, shoulder, elbow, wrist
+                - 关节速度 (4): arm_root, shoulder, elbow, wrist
+                - 手部末端位置 (2): pinch site 的 x, z
+                - 球位置 (2): ball 的 x, z
+                - 目标位置 (2): target 的 x, z
+                - 触觉传感器 (3): palm, fingertip, thumbtip (已做 clip 处理)
+                - 环境参数 (1): wall_height
         """
+        # 1. 提取空间位置 (World Coordinates)
         hand_pos = self.data.site_xpos[self.pinch_id][[0, 2]]  # 提取 X 和 Z 坐标
-        ball_pos = self.data.xpos[self.ball_id][[0, 2]]
-        target_pos = self.data.site_xpos[self.target_id][[0, 2]]
-        
-        return np.concatenate([
-            self.data.qpos[:4],      # 4个主关节位置
-            self.data.qvel[:4],      # 4个主关节速度
-            hand_pos,                # 手部末端位置 (2D)
-            ball_pos,                # 球位置 (2D)
-            target_pos,              # 目标位置 (2D)
-            [self.wall_height]       # 任务环境参数
+        ball_pos = self.data.xpos[self.ball_body_id][[0, 2]]
+        target_pos = self.data.xpos[self.target_body_id][[0, 2]]
+
+        # 2. 提取触觉传感器数据
+        touch_data = np.array([
+            self.data.sensordata[self.sensor_adr_palm],
+            self.data.sensordata[self.sensor_adr_fingertip],
+            self.data.sensordata[self.sensor_adr_thumbtip]
+        ])
+        touch_data = np.clip(touch_data, 0.0, 10.0) # 限制最大值，避免数值爆炸
+
+        # 3. 拼接所有观测项
+        obs = np.concatenate([
+            self.data.qpos[:4],      # 4: 关节角度
+            self.data.qvel[:4],      # 4: 关节角速度
+            hand_pos,                # 2: 手部位置
+            ball_pos,                # 2: 球位置
+            target_pos,              # 2: 目标位置
+            touch_data,              # 3: 触觉反馈 (关键新增)
+            [self.wall_height]       # 1: 动态障碍高度
         ]).astype(np.float32)
+
+        return obs
 
     def step(self, action):
         """执行环境的一步模拟并计算奖励。
@@ -171,99 +259,182 @@ class PlanarBringBallEnv(gym.Env):
         Returns:
             tuple: 包含 (obs, reward, terminated, truncated, info)。
         """
-        # Step1: 执行一步模拟
+        # --- 1. 执行一步模拟: 输入动作 -> 物理引擎模拟(mj_step)---
         self.data.ctrl[:] = action
-        mujoco.mj_step(self.model, self.data)
+
+        for _ in range(self.sim_substeps):
+            mujoco.mj_step(self.model, self.data)
+
+        # --- 2. 提取关键物理信息 ---
+        # 1. Observation
         obs = self._get_obs()
+
+        # 2. Positions (位置提取)
+        # 使用 site_xpos 获取标记点世界坐标，body_xpos 获取刚体质心世界坐标
+        object_pos = self.data.xpos[self.ball_body_id]
+        target_pos = self.data.xpos[self.target_body_id]
+
+        # palm_pos = self.data.site_xpos[self.palm_id]  # box 类型标记；判断是否贴掌  # 相对于 hand z 轴向前.043
+        grasp_pos = self.data.site_xpos[self.grasp_id]  # 判断是否“包住”  # 相对于 hand z 轴向前.065
+        pinch_pos = self.data.site_xpos[self.pinch_id]  # 对齐物体  # 相对于 hand z 轴向前.090
+        fingertip_pos = self.data.site_xpos[self.fingertip_id]  # 食指尖位置
+        thumbtip_pos = self.data.site_xpos[self.thumbtip_id]  # 拇指尖位置
+
+        # 3. Kinematics (运动学计算)
+        # 两指尖到 ball 的平均距离
+        dist_ft2b = np.linalg.norm(fingertip_pos - object_pos, axis=-1)  # 2D 距离 且 取(N, 3)的最后一个维度的范数
+        dist_tt2b = np.linalg.norm(thumbtip_pos - object_pos, axis=-1)
+        dist_at2b = (dist_ft2b + dist_tt2b) / 2.0
+
+        dist_pinch2b = np.linalg.norm(pinch_pos - object_pos, axis=-1)
+
+        dist_b2t = np.linalg.norm(object_pos - target_pos, axis=-1)
+
+        # 4. Dynamics (动力学/速度相关)
+        # 提取前4个主关节的速度
+        arm_vel = self.data.qvel[self.arm_qvel_indices]
+        arm_speed = np.linalg.norm(arm_vel)
+        # 每步的关节位移量 (用于判断是否在球附近稳定停顿)
+        arm_speed_step = arm_speed * self.model.opt.timestep
+
+        # 5. Logic Checks (抓取逻辑判断)
+        # A. 碰撞检测
+        contact_with_obj = False
+        for i in range(self.data.ncon):
+            con = self.data.contact[i]
+            if (con.geom1 == self.ball_geom_id and con.geom2 in self.hand_geom_ids) or \
+               (con.geom2 == self.ball_geom_id and con.geom1 in self.hand_geom_ids):
+                contact_with_obj = True
+                break
+
+        # B. 触觉数据
+        touch_threshold = 0.01  # float(cfg.touch_threshold)
+        # 至少有两个部位接触才认为可能有抓取意图
+        contacts_count = (
+            (self.data.sensordata[self.sensor_adr_palm] > touch_threshold) +
+            (self.data.sensordata[self.sensor_adr_fingertip] > touch_threshold) +
+            (self.data.sensordata[self.sensor_adr_thumbtip] > touch_threshold)
+        )
+        touch_ok = contacts_count >= 2
+
+        # C. 严格抓取判定 (抬起高度 > 阈值 且 有碰撞 且 传感器有压力)
+        is_grasped = (object_pos[2] > self.lift_threshold) and contact_with_obj and touch_ok
         
-        # Step2: 定义奖励
-        # 本质上分解任务，随着结果朝好的方向发展，reward 始终保持上升趋势，且梯度稳定，且鼓励在“波动端“朝好的方向发展
-        # 一种方式处理负奖励：通过 if 语句，在突破点，用一个正数（即突破奖励） - weight*（负奖励），确保奖励随进度正相关
-        # 另一种方式：构造平滑的函数适应这种，exp，tanh
-        # 最好那个控制奖励，实现梯度稳定
-        # 逐步引导或者添加算法本身的探索性
-        # 另一种方式：参考xxx，clip等等
+        # 6. 其他辅助计算
+        # A. 接近掩码：指尖是否在球附近 (阈值通常取球半径附近的 3-5cm)
+        hover_threshold = 0.10 # 建议在 config 设置为 0.10 self.cfg.hover_close_threshold
+        is_close_to_ball = 1.0 if dist_at2b < hover_threshold else 0.0
 
-        # 计算奖励组件，提取关键物理量（世界坐标下的 XZ 距离）
-        hand_pos = self.data.site_xpos[self.pinch_id]
-        ball_pos = self.data.xpos[self.ball_id]
-        target_pos = self.data.site_xpos[self.target_id]
+        # B. 抓取掩码：是否已经抓稳并离地
+        grasp_mask = 1.0 if is_grasped else 0.0
 
-        dist_h2b = np.linalg.norm(hand_pos - ball_pos)  # 手到球的距离
-        dist_b2t = np.linalg.norm(ball_pos - target_pos) # 球到目标的距离
+        # C. 抓取后的折扣因子：抓稳后不再需要强烈的接近/对准奖励
+        # post_grasp_discount 建议设置 0.5~0.9，引导重心转向 Transport ; self.cfg.post_grasp_discount
+        post_grasp_scale = 1.0 - grasp_mask * 0.7
 
-        # R1: 趋近奖励 (Reach)
-        # 解释：进入球半径范围 2.2cm 获得满分 1.0；在 50cm 范围内有平滑引导梯度
-        reward_reach = _tolerance(dist_h2b, bounds=(0, 0.022), margin=0.5, sigmoid='long_tail')
+        # --- 3. Rewards 计算 ---
+        # R1: Reach (接近奖励)
+        # 鼓励指尖靠近球，如果已经抓住了，降低此项权重
+        # dist_at2b: 两指尖到 ball 的平均距离,
+        r_reach = _tolerance(dist_pinch2b, bounds=(0.0, 0.02), margin=0.25, sigmoid="linear")
+        # 成功抓取则打 3 折
+        r_reach *= post_grasp_scale
 
-        # R2: 抓取引导奖励 (Grasp)
-        # 逻辑：只有当手离球足够近（< 0.03m）时，才奖励“闭合抓取器”的动作
-        # action[4] > 0 表示闭合。我们在 [0.8, 1.0] 范围内给满分。
-        reward_grasp = 0.0
-        if dist_h2b < 0.03:
-            reward_grasp = _tolerance(action[4], bounds=(0.8, 1.0), margin=0.5, sigmoid='linear')
+        # R2: Orient (对齐奖励)
+        # 计算 pinch 站点的 z 轴(前向)是否指向球
+        # site_xmat 是 3x3 旋转矩阵，第3列 [2, 5, 8] 是其 Z 轴方向
+        site_xmat = self.data.site_xmat[self.pinch_id].reshape(3, 3)
+        # 手部的朝向通常沿着 Site 的 Z 轴。得到手部“掌心朝向”的单位向量 hand_forward。
+        hand_forward = site_xmat[:, 2] 
+        unit_to_object = (object_pos - pinch_pos) / (np.linalg.norm(object_pos - pinch_pos) + 1e-6)
+        # 手的抓取轴朝向和手对球的朝向的点积
+        dot_product = np.sum(hand_forward * unit_to_object, axis=-1)  # 若为batch，不建议用 dot
+        r_orient = _tolerance(dot_product, bounds=(0.95, 1.0), margin=0.5,sigmoid="linear")
+        r_orient *= post_grasp_scale
 
-        # R3: 带球奖励 (Bring)
-        # 逻辑关键：只有当手离球很近（暗示球被控制住）时，才激活此奖励。
-        # 否则 Agent 会在还没抓到球时就想去目标点，导致姿态扭曲。
-        reward_bring = 0.0
-        if dist_h2b < 0.03:
-            # 目标距离核心区设为 5cm，缓冲区设为 80cm（覆盖整个工作空间）
-            reward_bring = _tolerance(dist_b2t, bounds=(0, 0.05), margin=0.8, sigmoid='long_tail')
+        # R3: Pause (停顿奖励)
+        # 鼓励在接近球时降低速度，防止“撞飞”球
+        r_pause = _tolerance(arm_speed_step, bounds=(0.0, 0.05), margin=0.3, sigmoid="linear")
+        r_pause = r_pause * is_close_to_ball
+        r_pause *= post_grasp_scale
 
-        # 最终奖励加权汇总
-        # 总奖励理论上限约为 1.0(reach) + 0.5(grasp) + 2.0(bring) = 3.5
-        reward = (self.w_1 * reward_reach + 
-                  self.w_2 * reward_grasp + 
-                  self.w_3 * reward_bring)
+        # R4: Close (抓取与维持奖励)
+        # 提取抓取器动作 (Action Index 4)
+        grasp_action = action[4] 
+
+        # 抓取意图奖励
+        r_close_intent = _tolerance(grasp_action, bounds=(0.8, 1.0), margin=1.0, sigmoid="linear", value_at_margin=0.01)
+        # 接近抓取阶段：需要(意图+接近+对齐+减速+碰撞)同时满足
+        r_approach_grasp = (r_close_intent * is_close_to_ball * r_orient * 
+                            r_pause * float(contact_with_obj))
         
-        """
-        # R1(-): 趋近奖励（鼓励末端靠近球）
-        reward_reach = - self.w_1 * dist_h2b 
-        # R2(+): 引导抓取：如果手离球很近，给一个额外的“鼓励抓取”奖励
-        # 可以通过判断两个手指头的位移，或者简单的距离阈值
-        reward_grasp = 0
-        if dist_h2b < 0.05:
-            # 引导 grasp 关节闭合 (假设 action[4] 是抓取)
-            reward_grasp = self.w_2 * (1.0 - dist_h2b/0.05)  # 0.5
-        # R3(+): 带球奖励：只有当球离开地面，或者球与手距离极近时，才增加 dist_b2t 的权重
-        # 否则 Agent 会在还没碰到球时就想去 target，导致姿态扭曲
-        reward_bring = 0
-        if dist_h2b < 0.03:
-            reward_bring = 2.0 - (self.w_3 * dist_b2t)  # 2
+        # 混合奖励：未抓稳时用 approach，抓稳后只关注维持抓取意图
+        r_close = (r_approach_grasp * (1.0 - grasp_mask) + r_close_intent * grasp_mask)
 
-        reward = reward_reach + reward_grasp + reward_bring
-        """
+        # R5: Lift & Transport (抬起与运输)
+        # 只有在抓取成功(grasp_mask)后才激活
+        r_lift = _tolerance(object_pos[2], bounds=(0.05, 0.50), margin=0.1,sigmoid="linear")  # 鼓励抬高
+        r_lift *= grasp_mask  
 
-        """
-        # 绕路引导
-        if obs[8] < 0.2 and obs[10] > 0.2:
-            dist_to_gate = np.linalg.norm(self.data.site_xpos[self.pinch_id] - [0.2, 0, self.wall_height + 0.1])
-            reward -= self.w_gate * dist_to_gate
-        """
+        r_transport = _tolerance(dist_b2t, bounds=(0.0, 0.01), margin=0.3,sigmoid="gaussian")
+        r_transport *= grasp_mask
 
-        # 终止逻辑 & R4(+)reward_success
+        r_precision = _tolerance(dist_b2t, bounds=(0.0, 0.0), margin=0.01, sigmoid="gaussian")  # 精确度奖励 cfg.precision_margin
+        r_precision *= grasp_mask
+
+        w_1 = float(self.cfg.reach_weight)
+        w_2 = float(self.cfg.orient_weight)
+        w_3 = float(self.cfg.pause_weight)
+        w_4 = float(self.cfg.close_weight)
+        w_51 = float(self.cfg.lift_reward_weight)
+        w_52 = float(self.cfg.transport_weight)
+        w_53 = float(self.cfg.precision_weight)
+        weight_sum = max(w_1 + w_2 + w_3 + w_4 + w_51 + w_52 + w_53, 1e-6)
+
+        w_success = float(self.cfg.reward_success)
+
+        # 复合总奖励(并限制在 [0, 1] 范围内)
+        # 基础阶段1-4：Reach + Orient + Pause + Close
+        # 进阶阶段5：Lift + Transport
+        reward = (w_1 * r_reach + 
+                  w_2 * r_orient + 
+                  w_3 * r_pause +
+                  w_4 * r_close + 
+                  w_51 * r_lift + w_52 * r_transport + w_53 * r_precision
+                  ) / weight_sum  
+
+        # --- 4. 终止与信息记录 ---
         self.current_step += 1
-        terminated = False
-        is_success=0
 
-        if dist_b2t < self.success_threshold:
-            reward += self.w_success # 给予一笔“终点奖金”
+        # 成功判定：球离目标极近
+        success = dist_b2t < self.success_threshold
+        
+        terminated = False
+        is_success_val = 0.0
+        if success:
+            reward += w_success  # 额外的通关大奖
             terminated = True
-            is_success = 1.0
+            is_success_val = 1.0
             
         truncated = self.current_step >= self.max_steps
 
-        # 组装 info 监控
         info = {
-            "is_success": is_success,
+            "reward_components": {
+                "reach": r_reach,
+                "orient": r_orient,     
+                "pause": r_pause,
+                "close": r_close,
+                "lift": r_lift,
+                "transport": r_transport,
+                "precision": r_precision,
+                "total": reward
+            },
+            "is_success": is_success_val,
             "dist_b2t": dist_b2t,
-            "dist_h2b": dist_h2b,
-            "r_reach": reward_reach,
-            "r_bring": reward_bring
+            "is_grasped": grasp_mask,
+            "wall_h": self.wall_height
         }
 
-        # 确保返回的是 Python float 而不是 numpy array
         return obs, float(reward), terminated, truncated, info
 
     def reset(self, seed: int = None, options: dict = None):
