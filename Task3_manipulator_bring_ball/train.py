@@ -64,6 +64,7 @@ import os
 # 应该是安装依赖的时候，conda pip 重复安装了 numpy，这里先跳过报错
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import numpy as np
+from collections import deque
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocVecEnv
 from stable_baselines3.common.callbacks import EvalCallback, BaseCallback
@@ -128,26 +129,50 @@ class SaveVecNormalizeCallback(BaseCallback):
 
 class InfoLoggerCallback(BaseCallback):
     """
-    自定义 Callback：从 env 的 info 中提取指标并记录到 TensorBoard
+    优化版自定义 Callback：从 env 的 info 中提取核心指标，并分类记录到 TensorBoard
     """
-    def __init__(self, verbose=0):
+    def __init__(self, window_size=100, verbose=0):
         super().__init__(verbose)
-        self.success_buffer = []
+        # 优化 1：使用 deque 实现“真正的”滑动窗口，而不是每 2048 步清空一次列表
+        self.success_buffer = deque(maxlen=window_size)
+        self.final_dist_buffer = deque(maxlen=window_size)
 
     def _on_step(self) -> bool:
-        # self.locals['infos'] 是一个包含所有并行环境 info 字典的列表
-        for info in self.locals['infos']:
-            if "is_success" in info:
-                self.success_buffer.append(info["is_success"])
-                # 记录实时高度
-                self.logger.record_mean("env/dist_ball_to_target", info["dist_b2t"])
+        # self.locals['dones'] 包含当前这一个 step 中，哪些并行环境结束了 Episode
+        dones = self.locals.get("dones")
+        infos = self.locals.get("infos")
 
-        # 每 2048 步计算一次平均成功率并记录
-        if len(self.success_buffer) >= 2048:
-            self.logger.record("env/rolling_success_rate", np.mean(self.success_buffer))
-            self.success_buffer = []
+        for idx, info in enumerate(infos):
+            
+            # --- A. 按步级 (Step-level) 记录的数据 ---
+            # 优化 2：榨干你 env.py 里的 info，把各项奖励拆解后打入 TensorBoard
+            # 这对于你排查 "为什么光对齐不抓取" 或者 "为什么一直发抖" 起到决定性作用
+            if "reward_components" in info:
+                for key, val in info["reward_components"].items():
+                    self.logger.record_mean(f"reward_parts/{key}", val)
+            
+            if "is_grasped" in info:
+                self.logger.record_mean("env_step/grasp_maintain_rate", info["is_grasped"])
+                
+            if "wall_h" in info:
+                self.logger.record_mean("env_step/current_wall_height", info["wall_h"])
+
+            # --- B. 按回合级 (Episode-level) 记录的数据 ---
+            # 优化 3：修复成功率计算逻辑。必须且仅能在回合结束 (Done) 时提取！
+            if dones[idx]:
+                if "is_success" in info:
+                    self.success_buffer.append(info["is_success"])
+                if "dist_b2t" in info:
+                    # 记录回合结束那一瞬间，球距离目标的最终距离
+                    self.final_dist_buffer.append(info["dist_b2t"])
+
+        # --- C. 将滑动窗口平均值写入 Logger ---
+        if len(self.success_buffer) > 0:
+            self.logger.record("env_episode/rolling_success_rate", np.mean(self.success_buffer))
+        if len(self.final_dist_buffer) > 0:
+            self.logger.record("env_episode/rolling_final_dist", np.mean(self.final_dist_buffer))
+
         return True
-
 
 def course_evaluate(model, env, n_episodes=30):
     """

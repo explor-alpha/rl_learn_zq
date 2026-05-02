@@ -7,10 +7,10 @@
 
 > v2.1 训练效果对比演示  
 
-<!-- 第一张：环境初始化（占一整行） -->
+<!-- 第一张：占一整行 -->
 <div align="center">
-  <img src="Task3_manipulator_bring_ball/show_results/env_随机初始化球和目标位置.gif" width="80%" alt="环境初始化">
-  <p><b>图 1：环境随机初始化（球与目标位置）</b></p>
+<img src="Task3_manipulator_bring_ball/show_results/Vedio1_环境测试.gif" width="80%">
+<p><b> Vedio 1：环境测试：xml 添加障碍 Wall ；env 随机初始化 Object、Target</b></p>
 </div>
 
 <br/>
@@ -166,6 +166,12 @@ python -c "import torch; print(torch.__version__); print(torch.backends.mps.is_a
 # (可选) Mac 录制视屏
 brew install ffmpeg
 ```
+
+```zsh
+# mov 转 gif
+for f in *.mov; do ffmpeg -i "$f" -vf "fps=18,scale=-1:600" -sws_flags lanczos -fps_mode cfr -an "${f%.mov}.gif"; done
+```
+
 
 > WSL/Windows: Install pytorch  
 ```bash

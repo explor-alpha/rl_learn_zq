@@ -33,16 +33,10 @@ xml 解读:
     3. 对于 ball 来说，body 内部定义的 site 没有设置偏移，故通过 site 和 body 获取的世界坐标都是质心位置
 4. mocap="true" 设置 target 虚拟点
 
-xml 和 env.py 的交互：
+和 env.py 的交互：
     - 导入和变量储存：
       - self.model (MjModel)—静态参数 (如 self.wall_height)
       - self.data (MjData)—动态参数 (如 self.data.qpos, self.data.xpos)
-    - env.py 中自定义 _init_ids，缓存关节 id
-      - 静态，对应 self.model
-      - 对应 xml 的不同组件：BODY(质量、惯性和整体位置)、GEOM(几何外观，如墙高)、JOINT、SITE(标记点,计算目标距离) 等
-    - 在 xml 中添加新的 site 或 geom，并在 env.py 中通过 self.data.site_xpos 或 self.data.xpos 获取它们的位置。
-    - 例如，添加一个名为 "curriculum_wall" 的 geom，在 env.py 中可以通过 self.data.geom_xpos[self.wall_id] 获取它的位置。
-    - 这些信息可以用于设计奖励函数，例如根据机械臂与墙的距离调整奖励，或者在训练过程中逐渐提高墙的高度。
 -->
 <mujoco model="planar manipulator - bring ball">
 
@@ -60,9 +54,9 @@ xml 和 env.py 的交互：
   </visual>
 
   <!-- 一次 mj_step = 现实中的 0.01 秒，与电脑运行速度无关 -->
-  <!-- 原 xml 设置 0.001 -->
-  <!-- 通过 self.model.opt.timestep 修改 -->
-  <option timestep="0.001" cone="elliptic"/>
+  <!-- 原值为 0.001 -->
+  <!-- 通过 self.model.opt.timestep 修改 或 直接修改 -->
+  <option timestep="0.01" cone="elliptic"/>
 
   <default>
     <geom friction=".7" solimp="0.9 0.97 0.001" solref=".005 1"/>
