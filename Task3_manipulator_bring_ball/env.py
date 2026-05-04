@@ -123,18 +123,18 @@ class PlanarBringBallEnv(gym.Env):
 
     def _init_time(self):
         """初始化仿真时间相关变量。
-        
-        [TODO]: 放到 config.py
         """
-        self.model.opt.timestep = 0.002   # physics dt（修改 xml）
-        self.sim_dt = self.model.opt.timestep
-        self.ctrl_dt = 0.01               # control dt（机器人）
+        self.ctrl_dt = self.cfg.ctrl_dt             # control dt（机器人）
+        self.sim_dt = self.cfg.sim_dt               # physics dt（修改 xml）
+        self.sim_substeps = self.cfg.sim_substeps
+
+        # 定义单步计算
+        self.model.opt.timestep = self.cfg.sim_dt
 
         # 需确保 sim_dt 能被 ctrl_dt 整除，否则报错
-        ratio = self.ctrl_dt / self.sim_dt
-        if abs(ratio - round(ratio)) > 1e-8:
+        if abs(self.ctrl_dt / self.sim_dt - self.sim_substeps) > 1e-8 :
             raise ValueError("ctrl_dt must be divisible by sim_dt")
-        self.sim_substeps = int(round(ratio))
+
 
     def _init_ids(self):
         """获取 xml 模型元素的 ID，并缓存，避免在 step 中频繁查询字符串
@@ -349,6 +349,7 @@ class PlanarBringBallEnv(gym.Env):
         # -- Phase 1 抓取成功(grasp_mask)后衰减 --
         # R11: Reach (接近奖励)
         r_reach = _tolerance(dist_grasp2b, bounds=(0.000, 0.007), margin=0.400, sigmoid="gaussian")
+        r_reach *= post_grasp_scale
 
         # R12: Orient (方向对齐奖励)
         # site_xmat 是 手的抓取轴朝向的 3x3 旋转矩阵，第3列site_xmat[:, 2] 是 Z 轴方向，得到手部“掌心朝向”的单位向量 hand_forward
@@ -358,11 +359,12 @@ class PlanarBringBallEnv(gym.Env):
         # 手的抓取轴朝向和手对球的朝向的点积
         dot_product = np.sum(hand_forward * unit_to_object, axis=-1)  # 若为batch，不建议用 dot
         r_orient = _tolerance(dot_product, bounds=(0.95, 1.0), margin=0.5,sigmoid="gaussian") 
+        r_orient *= post_grasp_scale
 
         # R13: Pause (停顿奖励)
         # 鼓励在接近球时降低速度，防止“撞飞”球
         r_pause = _tolerance(actual_displacement, bounds=(0.000, 0.001), margin=0.005, sigmoid="gaussian")
-        r_pause *= is_time_to_pause
+        r_pause *= is_time_to_pause * post_grasp_scale
 
         # -- Phase 2：没成功抓取半激活；抓取成功(grasp_mask)后完全激活 --
         # R2: Close (抓取)
@@ -375,9 +377,14 @@ class PlanarBringBallEnv(gym.Env):
 
         # -- Phase 3：只有在抓取成功(grasp_mask)后才激活 --
         # R31-R33: Lift & Transport (抬起与运输)
-        r_lift = _tolerance(object_pos[2], bounds=(0.040, 0.500), margin=0.040,sigmoid="linear")  # 鼓励抬高
+        r_lift = _tolerance(object_pos[2], bounds=(0.040, 0.500), margin=0.022,sigmoid="linear")  # 鼓励抬高
+        r_lift *= grasp_mask
+
         r_transport = _tolerance(dist_b2t, bounds=(0.000, 0.010), margin=0.700,sigmoid="gaussian")
-        r_precision = _tolerance(dist_b2t, bounds=(0.0, 0.005), margin=0.022, sigmoid="gaussian")  # 精确度奖励 cfg.precision_margin
+        r_transport *= grasp_mask
+
+        r_precision = _tolerance(dist_b2t, bounds=(0.000, 0.005), margin=0.022, sigmoid="gaussian")  # 精确度奖励 cfg.precision_margin
+        r_precision *= grasp_mask
 
         w_11 = float(self.cfg.reach_weight)
         w_12 = float(self.cfg.orient_weight)
@@ -395,9 +402,9 @@ class PlanarBringBallEnv(gym.Env):
         # Phase2：Close
         # Phase3：Lift + Transport
         reward = (
-            post_grasp_scale * (w_11 * r_reach + w_12 * r_orient + w_13 * r_pause) 
+             (w_11 * r_reach + w_12 * r_orient + w_13 * r_pause) 
             + w_2 * r_close 
-            + grasp_mask * (w_31 * r_lift + w_32 * r_transport + w_33 * r_precision) 
+            +  (w_31 * r_lift + w_32 * r_transport + w_33 * r_precision) 
             )/ weight_sum  
 
         # --- 4. 终止与信息记录 ---

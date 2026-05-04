@@ -50,12 +50,12 @@ def get_args():
     # 获取帮助信息
     mjpython Task3_manipulator_bring_ball/show.py --help
     # 最简化示例
-    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v5_exp-05_PPO_r5" --choose_model "latest" --match_id 95.26
-    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v5_exp-03_PPO_r5" --mode video 
+    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v5_exp-063_PPO_r5" --choose_model "latest" --match_id 86.94
+    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v5_exp-063_PPO_r5" --choose_model "latest" --match_id 86.94 --mode video 
     # 完整指令示例（演示）
-    mjpython Task3_manipulator_bring_ball/show.py --wall 0.020 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v5_exp-05_PPO_r5" --choose_model "latest" --match_id 95.26
+    mjpython Task3_manipulator_bring_ball/show.py --wall 0.020 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v5_exp-063_PPO_r5" --choose_model "latest" --match_id 86.94
     # 完整指令示例（录制） 
-    mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v5_exp-05_PPO_r5" --choose_model "latest" --match_id 95.26 --mode video -fps 100
+    mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v5_exp-063_PPO_r5" --choose_model "latest" --match_id 86.94 --mode video -fps 100
     """
 
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)

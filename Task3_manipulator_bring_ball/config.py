@@ -10,7 +10,7 @@ from typing import List, Dict
 @dataclass
 class TrainConfig:
     # --- 实验元信息 ---
-    exp_name: str = "v5_exp-05_PPO_r5"
+    exp_name: str = "v5_exp-063_PPO_r5"
     task_dir: str = os.path.dirname(os.path.abspath(__file__))
     xml_path: str = os.path.join(task_dir, "xml", "manipulator_bring_ball.xml")
     output_dir: str = os.path.join(task_dir, "outputs", exp_name)
@@ -18,11 +18,11 @@ class TrainConfig:
 
     ctrl_dt: float = 0.01  # 根据 real 频率确定
     sim_dt: float = 0.002  # 控制物理引擎计算进度；先选 sim_substeps 并确保 ctrl_dt/sim_dt 整除 # 用于顶替xml中的频率
-    sim_substeps: int = 0.01 / 0.002 # ctrl_dt/sim_dt 必须整除
+    sim_substeps: int = 5 # ctrl_dt/sim_dt 必须整除
     episode_max_time: float = 10.0 # 单个 episode 最长时间
-    episode_max_steps: int = 10.0 / 0.01   # 单个 episode 最大步数（env.py）# episode_max_time / ctrl_dt
+    episode_max_steps: int = 1000   # 单个 episode 最大步数（env.py）# episode_max_time / ctrl_dt
 
-    # --- DRL 相关参数 ---
+    # --- DRL 相关参数 --- 
     # 启动 CPU 并行运算
     n_envs = 16  # WSL CPU；使用并行环境数量
 
