@@ -133,7 +133,6 @@ class InfoLoggerCallback(BaseCallback):
     """
     def __init__(self, window_size=100, verbose=0):
         super().__init__(verbose)
-        # 优化 1：使用 deque 实现“真正的”滑动窗口，而不是每 2048 步清空一次列表
         self.success_buffer = deque(maxlen=window_size)
         self.final_dist_buffer = deque(maxlen=window_size)
 
@@ -145,12 +144,13 @@ class InfoLoggerCallback(BaseCallback):
         for idx, info in enumerate(infos):
             
             # --- A. 按步级 (Step-level) 记录的数据 ---
-            # 优化 2：榨干你 env.py 里的 info，把各项奖励拆解后打入 TensorBoard
-            # 这对于你排查 "为什么光对齐不抓取" 或者 "为什么一直发抖" 起到决定性作用
+            
+            # 1. 拆解奖励项打入 TensorBoard (得益于你的命名，Tensorboard 会自动有序排列)
             if "reward_components" in info:
                 for key, val in info["reward_components"].items():
                     self.logger.record_mean(f"reward_parts/{key}", val)
             
+            # 2. 核心状态监控
             if "is_grasped" in info:
                 self.logger.record_mean("env_step/grasp_maintain_rate", info["is_grasped"])
                 
@@ -158,12 +158,12 @@ class InfoLoggerCallback(BaseCallback):
                 self.logger.record_mean("env_step/current_wall_height", info["wall_h"])
 
             # --- B. 按回合级 (Episode-level) 记录的数据 ---
-            # 优化 3：修复成功率计算逻辑。必须且仅能在回合结束 (Done) 时提取！
+            # 必须且仅能在回合结束 (Done) 时提取，反映最终结果
             if dones[idx]:
                 if "is_success" in info:
                     self.success_buffer.append(info["is_success"])
                 if "dist_b2t" in info:
-                    # 记录回合结束那一瞬间，球距离目标的最终距离
+                    # 记录回合结束那一瞬间，球距离目标的最终物理距离
                     self.final_dist_buffer.append(info["dist_b2t"])
 
         # --- C. 将滑动窗口平均值写入 Logger ---
@@ -173,6 +173,7 @@ class InfoLoggerCallback(BaseCallback):
             self.logger.record("env_episode/rolling_final_dist", np.mean(self.final_dist_buffer))
 
         return True
+
 
 def course_evaluate(model, env, n_episodes=30):
     """

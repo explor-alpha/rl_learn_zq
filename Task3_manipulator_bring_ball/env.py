@@ -270,34 +270,38 @@ class PlanarBringBallEnv(gym.Env):
         Returns:
             tuple: 包含 (obs, reward, terminated, truncated, info)。
         """
-        # 记录上一时刻的状态变量
+        # --- 记录上一时刻的状态变量 ---
         prev_grasp_pos = self.data.site_xpos[self.grasp_id].copy()
+        prev_object_pos = self.data.xpos[self.ball_body_id].copy()
+        prev_target_pos = self.data.xpos[self.target_body_id].copy()
+        prev_dist_b2t = np.linalg.norm(prev_object_pos[..., [0, 2]] - prev_target_pos[..., [0, 2]], axis=-1)  # mocap-target 在 y 轴有前移（为了显示），故此处只用 x，z 轴
 
-        # --- 1. 执行一步模拟: 输入动作 -> 物理引擎模拟(mj_step)---
-        self.data.ctrl[:] = action
 
+        # --- 1. 执行一步 ctrl_dt: 接收 Policy Network 动作输出 -> 分sim_substeps步，物理引擎模拟计算(mj_step/sim_dt)---
+        self.data.ctrl[:] = action  # 将 Policy Network的动作输出写入 self.data.ctrl
         for _ in range(self.sim_substeps):
-            mujoco.mj_step(self.model, self.data)   # 按 sim_dt 分步计算，防止穿透
+            mujoco.mj_step(self.model, self.data)   # 按 sim_dt 分步计算，计算更精细，防止穿透
 
         # --- 2. 提取关键物理信息 ---
         # 1. Observation
         obs = self._get_obs()
 
         # 2. Positions (位置)
-        # 使用 site_xpos 获取标记点世界坐标，body_xpos 获取刚体质心世界坐标
+        # Body 类型: data.xpos[body_id]调用 body 的质心世界坐标
         object_pos = self.data.xpos[self.ball_body_id]
         target_pos = self.data.xpos[self.target_body_id]
 
-        palm_pos = self.data.site_xpos[self.palm_id]  # box 类型标记；判断是否贴掌  # 相对于 hand z 轴向前.043
-        grasp_pos = self.data.site_xpos[self.grasp_id]  # 判断是否“包住”  # 相对于 hand z 轴向前.065
-        pinch_pos = self.data.site_xpos[self.pinch_id]  # 对齐物体  # 相对于 hand z 轴向前.090
+        # SITE 类型: data.site_xpos[site_id]，调用 site（标记点）的世界坐标
+        palm_pos = self.data.site_xpos[self.palm_id]  # 相对于 hand z 轴向前.043
+        grasp_pos = self.data.site_xpos[self.grasp_id]  # 相对于 hand z 轴向前.065 # Key！抓取物体判断
+        pinch_pos = self.data.site_xpos[self.pinch_id]  # 相对于 hand z 轴向前.090 # 对齐 Orient
         fingertip_pos = self.data.site_xpos[self.fingertip_id]  # 食指尖位置
         thumbtip_pos = self.data.site_xpos[self.thumbtip_id]  # 拇指尖位置
 
         # 3. Kinematics (运动学/距离)
-        #dist_palm2b = np.linalg.norm(palm_pos - object_pos, axis=-1)
+        dist_palm2b = np.linalg.norm(palm_pos - object_pos, axis=-1)
         dist_grasp2b = np.linalg.norm(grasp_pos - object_pos, axis=-1)
-        #dist_pinch2b = np.linalg.norm(pinch_pos - object_pos, axis=-1)
+        dist_pinch2b = np.linalg.norm(pinch_pos - object_pos, axis=-1)
 
         # 两指尖到 ball 的平均距离
         dist_ft2b = np.linalg.norm(fingertip_pos - object_pos, axis=-1)  # 2D 距离 且 取(N, 3)的最后一个维度的范数
@@ -307,16 +311,11 @@ class PlanarBringBallEnv(gym.Env):
         dist_b2t = np.linalg.norm(object_pos[..., [0, 2]] - target_pos[..., [0, 2]], axis=-1)  # mocap-target 在 y 轴有前移（为了显示），故此处只用 x，z 轴
 
         # 4. Dynamics (动力学/速度相关)
-        # 获取最新的夹爪位置，用grasp_pos表征最理想的抓取前夹爪位置
-        current_grasp_pos = grasp_pos
         # 一个ctrl_dt控制步长内，夹爪移动的距离,反映速度
-        actual_displacement = np.linalg.norm(current_grasp_pos - prev_grasp_pos)
+        actual_displacement = np.linalg.norm(grasp_pos - prev_grasp_pos)
 
         # 5. Logic Checks (bool)
-        # 5.1. pause-接近判定：ball 是否靠近理想抓取点 grasp；用于判断减速时机
-        is_time_to_pause = 1.0 if dist_grasp2b < self.cfg.pause_grasp2b_threshold else 0.0
-
-        # 5.2. grasp-触觉信号;至少有两个部位接触才认为可能有抓取意图
+        # 5.1. grasp-触觉信号;至少有两个部位接触才认为可能有抓取意图
         touch_threshold = self.cfg.touch_sensor_threshold
         contacts_count = (
             (self.data.sensordata[self.sensor_adr_palm] > touch_threshold) +
@@ -325,7 +324,7 @@ class PlanarBringBallEnv(gym.Env):
         )
         touch_ok = contacts_count >= 1
 
-        # 5.3. grasp-碰撞检测
+        # 5.2. grasp-碰撞检测
         contact_ok = False
         for i in range(self.data.ncon):
             con = self.data.contact[i]
@@ -334,78 +333,128 @@ class PlanarBringBallEnv(gym.Env):
                 contact_ok = True
                 break
 
-        # 5.4. grasp-抬起高度
+        # 5.3. grasp-抬起高度
         lift_ok = False
         lift_threshold = self.cfg.lift_height_threshold
         lift_ok = object_pos[2] > lift_threshold
 
-        # 6. mask & discount
-        # 严格抓取判定 (抬起高度 > 阈值 且 有碰撞 且 传感器有压力) & 抓取掩码 & 抓取后的折扣因子：抓稳后不再需要强烈的接近/对准奖励;引导重心转向 Transport
+        # --- 3. Rewards 计算 ---
+        """
+        将任务分为以下几个 Phases:
+            Phase 1: 
+                目标是 is_grasped (成功抓取)；完成目标后满分计算
+                分为 5 部分 reward: R11-15
+            Phase 2:
+                实现成功抓取 -> 成功稳定送至目标
+                分为 3 部分 reward: R21-23
+
+        PS: 
+            使用 tolerance
+            每一种奖励独立出来。清晰，且可以结合 tensorboard
+            奖励总和加权平均，天然归一化
+        """
+        # -- Phase 1 --
+        # 严格抓取判定 (抬起高度 > 阈值 且 有碰撞 且 传感器有压力)
         is_grasped = touch_ok and contact_ok and lift_ok
         grasp_mask = 1.0 if is_grasped else 0.0
-        post_grasp_scale = 1.0 - grasp_mask * self.cfg.discount_post_grasp
 
-        # --- 3. Rewards 计算 ---
-        # -- Phase 1 抓取成功(grasp_mask)后衰减 --
         # R11: Reach (接近奖励)
         r_reach = _tolerance(dist_grasp2b, bounds=(0.000, 0.007), margin=0.400, sigmoid="gaussian")
-        r_reach *= post_grasp_scale
+        r_reach = r_reach * (1.0 - grasp_mask) + 1.0 * grasp_mask
 
-        # R12: Orient (方向对齐奖励)
-        # site_xmat 是 手的抓取轴朝向的 3x3 旋转矩阵，第3列site_xmat[:, 2] 是 Z 轴方向，得到手部“掌心朝向”的单位向量 hand_forward
-        site_xmat = self.data.site_xmat[self.pinch_id].reshape(3, 3)
+        # R12_1: Orient (方向对齐奖励)
+        site_xmat = self.data.site_xmat[self.pinch_id].reshape(3, 3)  # site_xmat 是 手的抓取轴朝向的 3x3 旋转矩阵，第3列site_xmat[:, 2] 是 Z 轴方向，得到手部“掌心朝向”的单位向量 hand_forward
         hand_forward = site_xmat[:, 2] 
         unit_to_object = (object_pos - pinch_pos) / (np.linalg.norm(object_pos - pinch_pos) + 1e-6)
-        # 手的抓取轴朝向和手对球的朝向的点积
-        dot_product = np.sum(hand_forward * unit_to_object, axis=-1)  # 若为batch，不建议用 dot
+        dot_product = np.sum(hand_forward * unit_to_object, axis=-1)  # 手的抓取轴朝向和手对球的朝向的点积 # 若为batch，不建议用 dot
+
         r_orient = _tolerance(dot_product, bounds=(0.95, 1.0), margin=0.5,sigmoid="gaussian") 
-        r_orient *= post_grasp_scale
+        r_orient = r_orient * (1.0 - grasp_mask) + 1.0 * grasp_mask
+
+        # R12_2：Asymmetry（引入一个“手指对称性”惩罚加强 Orient）
+        # 如果两根手指距离球的远近一样，说明球在正中间，差值为 0；如果差值很大，说明偏向一侧。
+        asymmetry = np.abs(dist_ft2b - dist_tt2b)
+        r_symmetry = _tolerance(asymmetry, bounds=(0.000, 0.002), margin=0.100, sigmoid="gaussian")
+        r_symmetry = r_symmetry * (1.0 - grasp_mask) + 1.0 * grasp_mask
+
+        r_orient *= r_symmetry
 
         # R13: Pause (停顿奖励)
-        # 鼓励在接近球时降低速度，防止“撞飞”球
+        is_time_to_pause = 1.0 if dist_grasp2b < self.cfg.pause_grasp2b_threshold else 0.0
+
         r_pause = _tolerance(actual_displacement, bounds=(0.000, 0.001), margin=0.005, sigmoid="gaussian")
-        r_pause *= is_time_to_pause * post_grasp_scale
+        r_pause *= is_time_to_pause
+        r_pause = r_pause * (1.0 - grasp_mask) + 1.0 * grasp_mask
 
-        # -- Phase 2：没成功抓取半激活；抓取成功(grasp_mask)后完全激活 --
-        # R2: Close (抓取)
-        # 抓取器grasp动作 (Action Index 4); <motor name="grasp" joint="finger" gear="10" .../> 对应电机的力矩控制而不是位移控制
-        grasp_action = action[4] 
-        r_close = _tolerance(grasp_action, bounds=(0.8, 1.0), margin=1.0, sigmoid="gaussian", value_at_margin=0.01)
-        rate_approach = (0.7 * r_reach * float(contact_ok) + 0.3 * r_orient * r_pause)
-        # 混合奖励：未抓稳时受 rate_approach 折减/引导，抓稳后拉满
-        r_close *= rate_approach * (1.0 - grasp_mask) + grasp_mask
+        # R14: Close (抓取)
+        grasp_action = action[4]  # 抓取器grasp动作 (Action Index 4); <motor name="grasp" joint="finger" gear="10" .../> 对应电机的力矩控制而不是位移控制
+       
+        #is_time_to_close = (r_reach * r_orient) * float(contact_ok) 
+        #r_close *= is_time_to_close  # 注不能有加号！ r_close *= (0.7 * r_reach * float(contact_ok) + 0.3 * r_orient * r_pause)
 
-        # -- Phase 3：只有在抓取成功(grasp_mask)后才激活 --
-        # R31-R33: Lift & Transport (抬起与运输)
-        r_lift = _tolerance(object_pos[2], bounds=(0.040, 0.500), margin=0.022,sigmoid="linear")  # 鼓励抬高
-        r_lift *= grasp_mask
+        r_close_intent = _tolerance(grasp_action, bounds=(0.8, 1.0), margin=1.0, sigmoid="gaussian", value_at_margin=0.01)
+        # Phase 1: Soft AND 门引导抓取时机；r_pause包含 is_time_to_pause约束，靠近后才有 close reward
+        r_approach_grasp = r_close_intent * (r_reach) * float(contact_ok) #  * r_orient * r_pause
+        # Phase 2: 抓稳后的维持约束
+        r_sustain_grasp = r_close_intent  # 抓稳后，得分直接取决于你的握力
+        # 用 grasp_mask 切换阶段
+        r_close = r_approach_grasp * (1.0 - grasp_mask) + r_sustain_grasp * grasp_mask
 
+        # R15: Lift_phase1
+        is_closed = touch_ok and contact_ok
+
+        r_lift = _tolerance(object_pos[2], bounds=(0.040, 0.500), margin=0.018,sigmoid="linear")  # 鼓励抬高
+        r_lift *= is_closed
+        r_lift = r_lift * (1.0 - grasp_mask) + 1.0 * grasp_mask
+
+        # -- Phase 2 --
+        # R21: Transport (运输)
         r_transport = _tolerance(dist_b2t, bounds=(0.000, 0.010), margin=0.700,sigmoid="gaussian")
-        r_transport *= grasp_mask
+        r_transport = r_transport * grasp_mask
 
-        r_precision = _tolerance(dist_b2t, bounds=(0.000, 0.005), margin=0.022, sigmoid="gaussian")  # 精确度奖励 cfg.precision_margin
-        r_precision *= grasp_mask
+        # R22: Precision (精确运输)
+        r_precision = _tolerance(dist_b2t, bounds=(0.000, 0.005), margin=0.022, sigmoid="gaussian") 
+        r_precision = r_precision * grasp_mask
+
+        # --- R+ ---
+        # R+: Progress (Potential-based Progress Reward)
+        # r_progress 本质上是一个势能差，随着时间积分它最终会趋近于 0（有进有退）;拆开能防止权重互相淹没
+        # 根据 Ng 教授的 Reward Shaping 理论，这种形式的奖励不会改变原有的最优策略，但能提供密集的正交梯度。
+        progress = prev_dist_b2t - dist_b2t
+        # 限制单步进度的上限，防止模型通过高频抖动刷分
+        progress = np.clip(progress, -0.01, 0.01) 
+        r_progress = progress * 100.0 * grasp_mask # 放大这个微小的增量到[-1, 1]
+        r_progress *= self.cfg.transport_progress_scale
+
+        # --- Penalties ---
+        # 拆开能防止权重互相淹没
+        # 悬停惩罚: 距离手很近 (r_reach很高)，但是没有触发闭合接触
+        is_hovering = (r_reach > 0.7) and not contact_ok 
+        penalty_hover = is_hovering * (1.0 - grasp_mask) # Phase1：{0，1}
+        penalty_hover *= - self.cfg.hover_penalty_scale
 
         w_11 = float(self.cfg.reach_weight)
         w_12 = float(self.cfg.orient_weight)
         w_13 = float(self.cfg.pause_weight)
-        w_2 = float(self.cfg.close_weight)
-        w_31 = float(self.cfg.lift_reward_weight)
-        w_32 = float(self.cfg.transport_weight)
-        w_33 = float(self.cfg.precision_weight)
-        weight_sum = max(w_11 + w_12 + w_13 + w_2 + w_31 + w_32 + w_33, 1e-6)
-
-        w_success = float(self.cfg.reward_success)
+        w_14 = float(self.cfg.close_weight)
+        w_15 = float(self.cfg.lift_reward_weight)
+        w_21 = float(self.cfg.transport_weight)
+        w_22 = float(self.cfg.precision_weight)
+        weight_sum = max(w_11 + w_12 + w_13 + w_14 + w_15 + w_21 + w_22, 1e-6)
 
         # 复合总奖励(并限制在 [0, 1] 范围内)
-        # Phase1：Reach + Orient + Pause
-        # Phase2：Close
-        # Phase3：Lift + Transport
+        # Phase1：Reach + Orient + Pause + Close + Lift_phase1 (Close 特殊；Hover 惩罚)
+        # Phase2：Transport + Precision (Progress 引力场)
         reward = (
-             (w_11 * r_reach + w_12 * r_orient + w_13 * r_pause) 
-            + w_2 * r_close 
-            +  (w_31 * r_lift + w_32 * r_transport + w_33 * r_precision) 
-            )/ weight_sum  
+            (
+                w_11 * r_reach + w_12 * r_orient + w_13 * r_pause 
+                + w_14 * r_close + w_15 * r_lift
+                + w_21 * r_transport + w_22 * r_precision
+            )
+            / weight_sum  
+            + penalty_hover 
+            + r_progress
+        )
 
         # --- 4. 终止与信息记录 ---
         self.current_step += 1
@@ -414,29 +463,32 @@ class PlanarBringBallEnv(gym.Env):
         success = dist_b2t < self.cfg.success_dist_threshold
         
         terminated = False
+        
         is_success_val = 0.0
         if success:
-            reward += w_success  # 额外的通关大奖
-            terminated = True
+            # reward += w_success  # 额外的通关大奖
+            # terminated = True
             is_success_val = 1.0
             
         truncated = self.current_step >= self.max_steps
 
         info = {
             "reward_components": {
-                "reach": r_reach,
-                "orient": r_orient,     
-                "pause": r_pause,
-                "close": r_close,
-                "lift": r_lift,
-                "transport": r_transport,
-                "precision": r_precision,
+                "11_reach": r_reach,
+                "12_orient": r_orient,     
+                "13_pause": r_pause,
+                "14_close": r_close,
+                "15_lift": r_lift,
+                "21_transport": r_transport,
+                "22_precision": r_precision,
+                "+_progress": r_progress,
+                "-_penalty_hover": penalty_hover,
                 "total": reward
             },
-            "is_success": is_success_val,
-            "dist_b2t": dist_b2t,
+            "wall_h": self.wall_height,
             "is_grasped": grasp_mask,
-            "wall_h": self.wall_height
+            "dist_b2t": dist_b2t,
+            "is_success": is_success_val
         }
 
         return obs, float(reward), terminated, truncated, info

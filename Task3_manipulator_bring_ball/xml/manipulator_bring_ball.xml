@@ -13,7 +13,7 @@ xml 解读:
 2. xml 的不同组件：
     1. Geom ID: 几何外观，如墙高
     2. SITE ID: 标记点世界坐标,计算目标距离；data.site_xpos[site_id]，调用 site（标记点）的世界坐标
-    3. Body ID: 质量、惯性、质心世界坐标；data.body_xpos[body_id]调用 body 的质心世界坐标
+    3. Body ID: 质量、惯性、质心世界坐标；data.xpos[body_id]调用 body 的质心世界坐标
     4. Joint ID: 关节位置、速度等状态信息；通过 self.model.jnt_range[joint_id] 获取关节的动作范围
     - env.py 中自定义 _init_ids，缓存关节 id
 3. 搜索整个文档的 site 标记点：

@@ -38,6 +38,13 @@
   </tr>
 </table>
 
+<br/>
+
+<div align="center">
+<img src="Task3_manipulator_bring_ball/show_results/Vedio7_success.gif" width="80%">
+<p><b>Vedio7_success</b></p>
+</div>
+
 ---
 
 ## Details  
@@ -89,15 +96,17 @@ mjpython Task3_manipulator_bring_ball/show.py --help
 ```zsh
 # 最简化示例
 # 注意--exp_name别错了！！！在 outputs 文件夹里
-mjpython Task3_manipulator_bring_ball/show.py --exp_name "v5_exp-063_PPO_r5" --choose_model "latest" --match_id 86.94
+mjpython Task3_manipulator_bring_ball/show.py --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09
 ```
 
 ```zsh
 # 完整指令示例（演示）
-mjpython Task3_manipulator_bring_ball/show.py --wall 0.020 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v5_exp-063_PPO_r5" --choose_model "latest" --match_id 86.94
+mjpython Task3_manipulator_bring_ball/show.py --wall 0.020 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09
+```
 
+```zsh
 # 完整指令示例（录制）
-mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v5_exp-063_PPO_r5" --choose_model "latest" --match_id 86.94 --mode video -fps 100
+mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09 --mode video -fps 100
 ```
 
 ---
