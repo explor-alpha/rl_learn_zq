@@ -95,14 +95,11 @@ class SyncVecNormalizeCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         """每步执行的逻辑。只在 Rollout 结束或评估前同步，减少每步操作开销"""
-        return True
-
-    def _on_rollout_end(self) -> None:
-        """在每一轮收集结束后同步统计数据。"""
+        # EvalCallback 调用子 Callback 时，必定触发 _on_step
+        # 必须在这里强行同步观测值的均值和方差！
         self.eval_env.obs_rms = self.train_env.obs_rms
-        # self.eval_env.ret_rms = self.train_env.ret_rms # 评估时不要对 reward 归一化
-        if self.verbose > 0:
-            print("[Callback] 已同步 VecNormalize 统计数据到评估环境")
+        # 不对reward进行处理
+        return True
 
 class SaveVecNormalizeCallback(BaseCallback):
     """
@@ -326,7 +323,7 @@ def train():
 
     while stage_idx < total_stages:
         # --- best 保存路径(覆盖逻辑) ，仅最后阶段保存，减小计算开销---
-        if_save_best = True  # if_save_best = (stage_idx == total_stages - 1)
+        if_save_best = (stage_idx == total_stages - 1)
         best_model_dir = None
         save_vec_callback = None
 
@@ -385,6 +382,11 @@ def train():
             tb_log_name=f"stage_{stage_idx}",  
             callback=[eval_callback, info_callback]
         )
+
+        # ---- [极其关键的新增代码] ----
+        print("正在同步最终评估环境的观测分布...")
+        eval_env.obs_rms = env.obs_rms
+        # -----------------------------
 
         # 3. 阶段结课评估
         mean_reward, success_rate = course_evaluate(model, eval_env, n_episodes=30)

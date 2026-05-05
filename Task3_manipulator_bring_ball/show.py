@@ -37,7 +37,7 @@ def get_args():
     参考: train 阶段环境参数初始化 (世界坐标,单位统一):
         1. 墙体 (Wall):
         - 位置: 固定在 x = 0.200
-        - 高度: 0.000 ~ 0.250 (wall_height, defined in config.py)
+        - 高度: {0.000, 0.050, 0.100, 0.250} (wall_height, defined in config.py)
         2. 球 (Ball) 初始范围: 
         - x (随机): [0.250, 0.350] (位于墙右侧)
         - z: 约为 0.032, 可取 0.032 (球的半径为 0.022,略高于地面0.010, 防止穿透)
@@ -50,12 +50,11 @@ def get_args():
     # 获取帮助信息
     mjpython Task3_manipulator_bring_ball/show.py --help
     # 最简化示例
-    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09
-    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09 --mode video 
+    mjpython Task3_manipulator_bring_ball/show.py --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-3
     # 完整指令示例（演示）
-    mjpython Task3_manipulator_bring_ball/show.py --wall 0.020 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09
+    mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-3
     # 完整指令示例（录制） 
-    mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09 --mode video -fps 100
+    mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-3 --mode video --fps 100
     """
 
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -65,8 +64,8 @@ def get_args():
                         help="运行模式: human (实时渲染) 或 video (录制)")
     
     # 环境控制参数
-    parser.add_argument("--wall", type=float, default=0.020, 
-                        help="(课程学习)默认0.020; 可手动指定障碍墙高度(如: --wall 0.250)")
+    parser.add_argument("--wall", type=float, default=0.250, 
+                        help="(课程学习)默认0.250; 可手动指定障碍墙高度(如: --wall 0.050)")
     parser.add_argument("--ball", type=float, nargs=2, metavar=('X', 'Z'), 
                         help="默认随机；可手动指定球的初始位置(如: --ball 0.300 0.032)")
     parser.add_argument("--target", type=float, nargs=2, metavar=('X', 'Z'), 
@@ -80,7 +79,7 @@ def get_args():
     parser.add_argument("--choose_model", type=str, default="latest", choices=["best", "latest", "stages"],
                         help="从outputs/对应目录加载模型和统计数据; default='latest'; 可手动指定: best; latest; stages")
     parser.add_argument("--match_id", type=str, default=None,
-                        help="通过文件名中的特定标识来快速筛选模型；默认选择 reward 最高的；可手动指定: 如步数'2002944'或奖励'23.94'。")
+                        help="通过文件名中的特定标识来快速筛选模型；默认选择 reward 最高的（有些 bug，建议手动）；可手动指定: 如步数'2002944'或奖励'23.94'。")
     parser.add_argument("--fps", type=int, default=100, 
                         help="渲染/视频帧率, ctrl_dt=0.01s, 建议帧率为 100fps; 调小可以放慢速度")
     
@@ -158,12 +157,14 @@ def main():
             obs, rewards, dones, infos = env.step(action)
             
             if args.mode == "human":
-                env.render()
+                env.venv.envs[0].render()  # 直接调用原生环境的 render
                 time.sleep(1.0 / args.fps) # 稍微减慢预览速度；尽量匹配环境的渲染速度 (1/90s)
             else:
                 # 录制模式：手动提取帧；调用env.render() ，刷帧
-                frame = env.render() 
-                frames.append(frame)
+                # 录制模式：提取原生环境返回的 rgb_array
+                frame = env.venv.envs[0].render()
+                if frame is not None:
+                    frames.append(frame)
             
             if dones[0]:
                 print(f"Episode 结束 (Step {i})")

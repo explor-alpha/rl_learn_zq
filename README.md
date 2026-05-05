@@ -42,8 +42,33 @@
 
 <div align="center">
 <img src="Task3_manipulator_bring_ball/show_results/Vedio7_success.gif" width="80%">
-<p><b>Vedio7_success</b></p>
+<p><b>Vedio7_第一次成功（对应`--wall 0.00 --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09`）</b></p>
 </div>
+
+<br/>
+
+<table style="width: 100%; border-collapse: collapse; border: none;">
+  <tr style="border: none;">
+    <td width="50%" align="center" style="border: none;">
+      <img src="Task3_manipulator_bring_ball/show_results/Vedio8_wall_0.00.gif" width="100%">
+      <br><sub>Vedio8_wall_0.00（对应`--wall 0.00 --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-0`）</sub>
+    </td>
+    <td width="50%" align="center" style="border: none;">
+      <img src="Task3_manipulator_bring_ball/show_results/Vedio9_wall_0.05.gif" width="100%">
+      <br><sub>Vedio9_wall_0.05（对应`--wall 0.05 --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-1`）</sub>
+    </td>
+  </tr>
+  <tr style="border: none;">
+    <td width="50%" align="center" style="border: none;">
+      <img src="Task3_manipulator_bring_ball/show_results/Vedio10_wall_0.10.gif" width="100%">
+      <br><sub>Vedio10_wall_0.10（对应`--wall 0.10 --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-2`）</sub>
+    </td>
+    <td width="50%" align="center" style="border: none;">
+      <img src="Task3_manipulator_bring_ball/show_results/Vedio11_wall_0.25.gif" width="100%">
+      <br><sub>Vedio11_wall_0.25（对应`--wall 0.25 --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-3`）</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -96,17 +121,17 @@ mjpython Task3_manipulator_bring_ball/show.py --help
 ```zsh
 # 最简化示例
 # 注意--exp_name别错了！！！在 outputs 文件夹里
-mjpython Task3_manipulator_bring_ball/show.py --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09
+mjpython Task3_manipulator_bring_ball/show.py --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-3
 ```
 
 ```zsh
 # 完整指令示例（演示）
-mjpython Task3_manipulator_bring_ball/show.py --wall 0.020 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09
+mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-3
 ```
 
 ```zsh
 # 完整指令示例（录制）
-mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09 --mode video -fps 100
+mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-3 --mode video --fps 100
 ```
 
 ---
