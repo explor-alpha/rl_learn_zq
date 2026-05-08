@@ -1,9 +1,19 @@
-# 强化学习 学习过程记录 & 辅修课程“数据驱动的智能控制”⼤作业   —**上海大学 郑群 23122932**  
+# RL_learn_zq : Hello Embodied AI   —**上海大学 郑群 23122932**  
 
-### 🎬 Task3平面机械手抓球任务—调试过程训练效果演示  
+## 🔥 News & Highlights  
+  - **[2026-05-08]**  延伸[Task3]：梳理 Value-based RL；Policy-based RL 的 Basic ideas（从理论推理和演进脉络角度）—— [查看报告-附录部分](./Task3_manipulator_bring_ball/reports/Task3.pdf)   
+  - **[2026-05-07]**  延伸[Task3]：结合代码&理论，梳理 Task3 实现流程（MDP 问题建模；并行环境 PPO 数据采集；梯度回传；最优策略）—— [查看流程图](./Task3_manipulator_bring_ball/show_results/KeyNotes_1.webp)   
+  - **[2026-05-06]**  **完善[Task3]：从 0 实现 “平面-机械手：操控物体-跨障-送至目标位置” (基于 MuJoCo & Stable Baselines3)**  
+  - **[2026-04-15]**  新增[Task1]：手写强化学习算法，跑通 CartPole，Pendulum  
+
+---
+
+### 🎬 Show results (Task3：debug & final results)  
+
+> 视频存放路径：./Task3_manipulator_bring_ball/show_results
 
 <div align="center">
-<img src="Task3_manipulator_bring_ball/show_results/Vedio1_test_环境测试.gif" width="80%">
+<img src="Task3_manipulator_bring_ball/show_results/Vedio1_test_环境测试.gif" width="50%">
 <p><b>Vedio1_test_环境测试</b></p>
 </div>
 
@@ -41,7 +51,7 @@
 <br/>
 
 <div align="center">
-<img src="Task3_manipulator_bring_ball/show_results/Vedio7_success.gif" width="80%">
+<img src="Task3_manipulator_bring_ball/show_results/Vedio7_success.gif" width="60%">
 <p><b>Vedio7_第一次成功（对应`--wall 0.00 --exp_name "v6.0_exp-01_PPO" --choose_model "latest" --match_id 69.09`）</b></p>
 </div>
 
@@ -70,15 +80,14 @@
   </tr>
 </table>
 
+
 ---
 
-## Details  
-
-**Task3(Key): 基于给定 xml(略作修改)，从 0 实现“平面机械手跨越障碍抓球“**：  
+## Task3(Key): 从 0 实现 “平面-机械手：操控物体-跨障-送至目标位置” (基于 MuJoCo & Stable Baselines3)：  
 
 ```
 rl_learn_zq_native/
-├── Task3_manipulator_bring_ball/    # 【Task3】：从 0 实现“平面机械手跨越障碍抓球“
+├── Task3_manipulator_bring_ball/      # 【Task3】：从 0 实现 “平面-机械手：操控物体-跨障-送至目标位置”
 │   ├── xml/                               # 仿真建模
 │   │   ├── manipulator_bring_ball.xml     # 核心模型 xml
 │   │   └── test_xml.py                    # 核心模型 xml 导入测试
@@ -99,6 +108,13 @@ rl_learn_zq_native/
 - DeepMind Control Suite: Manipulator 是一个经典的连续控制强化学习（Reinforcement Learning, RL）基准测试环境。它基于 MuJoCo 物理引擎构建，旨在模拟和解决高维度、复杂的机械臂操作问题。  
 - 刚刚学习完强化学习基础理论，为了感受“奖励函数的定义”“课程学习”等等强化学习领域的常用技巧，本实验基于 DeepMind Control Suite: Manipulator 提供的 xml 模型文件，并在此基础上加入障碍（可以变化高度的墙）；通过强化学习标准算法库 Stable Baselines3 以及物理引擎 MuJoCo，从 0 实现“平面-机械手：操控物体-跨障-送至目标位置”任务。  
 - “平面-机械手：操控物体-跨障-送至目标位置”是一个二维平面（x-z）的抓取、避障、搬运任务。智能体（Agent）需要学习一套控制策略，驱动机械臂从随机的初始状态出发，跨越不同高度的障碍墙，准确抓取（或推动）球体，并将其运送至墙另一侧的目标位置。  
+
+> **本文将“机械手跨障抓取与放置”的过程建模成马尔可夫决策过程（Markov Decision Process, MDP），并利用 PPO 算法优化 Policy Network，得到最优解。**  
+
+<div align="center">
+  <img src="./Task3_manipulator_bring_ball/show_results/KeyNotes_1.webp" width="80%" />
+</div>
+
 
 > 任务原型(略微修改): DeepMind Control Suite: Manipulator  
 > 原始xml来源(略微修改): https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml  
@@ -178,8 +194,8 @@ rl_learn_zq_native/
 
 ---
 
-### 环境配置
-#### Macbook M5环境配置（**Native**）
+## 环境配置
+### Macbook M5环境配置（**Native**）
 ```zsh
 conda create -n rl_learn python=3.10 -y
 conda activate rl_learn
@@ -197,7 +213,7 @@ export KMP_DUPLICATE_LIB_OK=TRUE
 python -c "import torch; print(torch.__version__); print(torch.backends.mps.is_available())"
 ``` 
 
-#### 其他可选项
+### 其他可选项
 
 > Mac: (可选)录制视屏  
 ```zsh

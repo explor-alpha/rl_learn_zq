@@ -10,7 +10,7 @@ from typing import List, Dict
 @dataclass
 class TrainConfig:
     # --- 实验元信息 ---
-    exp_name: str = "v6.1_exp-01_PPO"
+    exp_name: str = "v6.1_exp-02_PPO"
     task_dir: str = os.path.dirname(os.path.abspath(__file__))
     xml_path: str = os.path.join(task_dir, "xml", "manipulator_bring_ball.xml")
     output_dir: str = os.path.join(task_dir, "outputs", exp_name)
@@ -40,29 +40,28 @@ class TrainConfig:
 
     # --- reward 相关参数 ---
     # 阈值
-    pause_grasp2b_threshold: float = 0.200 
+    pause_grasp2b_threshold: float = 0.200  
     touch_sensor_threshold: float = 0.01
-    lift_height_threshold: float = 0.040  # 球被抬起的高度阈值，超过这个高度视为成功抬起
+    lift_height_threshold: float = 0.040  
     pause_b2t_threshold: float = 0.200     
     success_dist_threshold: float = 0.010
 
     # 奖励权重
-    # discount_post_grasp: float = 0.7  # 建议设置 0.5~0.9
-
     reach_weight: float = 1.0    # 1.0
     orient_weight: float = 1.5   # 1.5
     pause_weight: float = 0.5    # 0.5
-    close_weight: float = 3.0    # 2.0
+    close_weight: float = 3.0    # 3.0
     lift_reward_weight: float = 1.0  # 1.0
 
     transport_weight: float = 6.0    # 6.0
-    pause2_weight: float = 1.0    # 6.0
+    pause2_weight: float = 1.0    # 1.0
     precision_weight: float = 1.0    # 1.0
 
     transport_progress_scale: float = 2.0    # 2.0
-    hover_penalty_scale: float = 0.00    # 0.02
+    hover_penalty_scale: float = 0.00    # 0.00
 
-    # reward_success: float = 100.0  # 不能太小避免淹没；不能太大 Critic 网络梯度爆炸；尝试 50-200
+    # discount_post_grasp: float = 0.7  # 建议设置 0.5~0.9
+    # reward_success: float = 50.0  # 不能太小避免淹没；不能太大 Critic 网络梯度爆炸；尝试 50-200
 
     # --- 课程学习配置 ---
     curriculum_stages: List[Dict] = field(default_factory=lambda: [

@@ -299,7 +299,7 @@ def train():
     else:
         print(f"未检测到存档，开始全新训练...")
         env = VecNormalize(venv, norm_obs=True, norm_reward=False, clip_obs=10.)
-        model = PPO("MlpPolicy", env, 
+        model = PPO("MlpPolicy", env,  # 不共享 Critic Network 和 Actor Network 参数 # "MlpPolicy" 默认会构建两套完全独立的多层感知机（MLP）
                     learning_rate=cfg.learning_rate,
                     n_steps=cfg.n_steps,   # 每次训练前采集的总样本量 = n_steps * n_envs
                     batch_size=cfg.batch_size,
