@@ -37,6 +37,22 @@ xml 解读:
     - 导入和变量储存：
       - self.model (MjModel)—静态参数 (如 self.wall_height)
       - self.data (MjData)—动态参数 (如 self.data.qpos, self.data.xpos)
+
+核心功能总结：
+1. `.xml` 文件基于 MuJoCo 规范构建了系统的底层物理与运动学基座。我将其核心功能分为两面：
+	1. [构建物理模型] (配合 MuJoCo 物理引擎进行动力学计算)：
+		1. 全局配置 `<option>`：全局积分步长/亦对应真实控制频率（`timestep="0.01"`）；底层力学解算规则（`cone="elliptic"`）
+		2. 以单个关节为单位/对象：定义其物理特性（质量、惯性张量、摩擦系数），几何特性（尺寸）与视觉特性
+		3. 定义关节间关系，主要是运动学特性：物理实体间的运动学拓扑连接（限定平面运动的旋转与滑动约束）、相对空间坐标
+		4. 感知系统：触觉传感器（`<sensor>`）
+		5. 驱动系统：电机执行器（`<actuator>`，力矩控制/位移控制）
+		6. 联动
+	2. [暴露关节 ID API]（供上层强化学习环境（`env.py`）在每个交互步（`step`）中进行高频的状态读写，进而定义奖励函数以及终止判断等等）：
+		1. Geom ID: 几何外观，如墙高
+		2. SITE ID: 标记点世界坐标,计算目标距离；data.site_xpos[site_id]，调用 site（标记点）的世界坐标
+		3. Body ID: 质量、惯性、质心世界坐标；data.xpos[body_id]调用 body 的质心世界坐标
+	3. 其他：
+		1. 辅助：固定相机视场（`camera`）。
 -->
 <mujoco model="planar manipulator - bring ball">
 

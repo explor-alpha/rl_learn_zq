@@ -1,9 +1,9 @@
 # RL_learn_zq : Hello Embodied AI   —**上海大学 郑群 23122932**  
 
 ## 🔥 News & Highlights  
-  - **[2026-05-08]**  延伸[Task3]：梳理 Value-based RL；Policy-based RL 的 Basic ideas（从理论推理和演进脉络角度）—— [查看报告-附录部分](./Task3_manipulator_bring_ball/reports/Task3.pdf)   
-  - **[2026-05-07]**  延伸[Task3]：结合代码&理论，梳理 Task3 实现流程（MDP 问题建模；并行环境 PPO 数据采集；梯度回传；最优策略）—— [查看流程图](./Task3_manipulator_bring_ball/show_results/KeyNotes_1.webp)   
-  - **[2026-05-06]**  **完善[Task3]：从 0 实现 “平面-机械手：操控物体-跨障-送至目标位置” (基于 MuJoCo & Stable Baselines3)**  
+  - **[2026-05-08]**  延伸[Task3]：**梳理理论: Basic ideas of PPO（从理论推理和演进脉络角度）**—— [查看PPT/报告-附录](./Task3_manipulator_bring_ball/reports/Task3.pdf)   
+  - **[2026-05-07]**  延伸[Task3]：**梳理项目实现过程："基于 PPO 优化最优策略全过程"数据流**—— [查看流程图-"PPO 数据流"](./Task3_manipulator_bring_ball/show_results/KeyNotes_1.webp)   
+  - **[2026-05-06]**  完善[Task3]：**从 0 实现 “平面-机械手：操控物体-跨障-送至目标位置” (基于 MuJoCo & Stable Baselines3)**  
   - **[2026-04-15]**  新增[Task1]：手写强化学习算法，跑通 CartPole，Pendulum  
 
 ---
@@ -11,6 +11,11 @@
 ### 🎬 Show results (Task3：debug & final results)  
 
 > 视频存放路径：./Task3_manipulator_bring_ball/show_results
+
+```zsh
+# 完整指令示例（演示）
+mjpython Task3_manipulator_bring_ball/show.py --wall 0.250 --ball 0.300 0.032 --target -0.250 0.400 --exp_name "v6.1_exp-01_PPO" --choose_model "stages" --match_id stage-3
+```
 
 <div align="center">
 <img src="Task3_manipulator_bring_ball/show_results/Vedio1_test_环境测试.gif" width="50%">
@@ -105,21 +110,22 @@ rl_learn_zq_native/
 │   └── show.py                            # 自定义：演示 & 视频录制脚本
 ```
 
-- DeepMind Control Suite: Manipulator 是一个经典的连续控制强化学习（Reinforcement Learning, RL）基准测试环境。它基于 MuJoCo 物理引擎构建，旨在模拟和解决高维度、复杂的机械臂操作问题。  
-- 刚刚学习完强化学习基础理论，为了感受“奖励函数的定义”“课程学习”等等强化学习领域的常用技巧，本实验基于 DeepMind Control Suite: Manipulator 提供的 xml 模型文件，并在此基础上加入障碍（可以变化高度的墙）；通过强化学习标准算法库 Stable Baselines3 以及物理引擎 MuJoCo，从 0 实现“平面-机械手：操控物体-跨障-送至目标位置”任务。  
-- “平面-机械手：操控物体-跨障-送至目标位置”是一个二维平面（x-z）的抓取、避障、搬运任务。智能体（Agent）需要学习一套控制策略，驱动机械臂从随机的初始状态出发，跨越不同高度的障碍墙，准确抓取（或推动）球体，并将其运送至墙另一侧的目标位置。  
+**基于 MuJoCo、Gymnasium、 Stable Baselines3，从 0 实现“平面-机械手：操控物体-跨障-送至目标位置”任务**
+- 任务描述：“平面-机械手：操控物体-跨障-送至目标位置”为二维平面（x-z）的抓取、避障、搬运任务。智能体（Agent）需要学习一套控制策略，驱动机械臂从随机的初始状态出发，跨越不同高度的障碍墙，准确抓取（或推动）球体，并将其运送至墙另一侧的目标位置。  
+- 技术栈：Python / Git; MuJoCo / Gymnasium / Stable Baselines3  
+- 原始 xml 模型文件来源：DeepMind Control Suite: Manipulator  
 
-> **本文将“机械手跨障抓取与放置”的过程建模成马尔可夫决策过程（Markov Decision Process, MDP），并利用 PPO 算法优化 Policy Network，得到最优解。**  
+> **本文将“机械手跨障抓取与放置”的时序过程建模成马尔可夫决策过程（Markov Decision Process, MDP），并利用 PPO 算法优化 Policy Network，得到最优解。**  
 
 <div align="center">
   <img src="./Task3_manipulator_bring_ball/show_results/KeyNotes_1.webp" width="80%" />
 </div>
 
 
-> 任务原型(略微修改): DeepMind Control Suite: Manipulator  
-> 原始xml来源(略微修改): https://github.com/Motphys/MotrixLab/blob/main/motrix_envs/src/motrix_envs/basic/manipulator/manipulator_bring_ball.xml  
-
 ### Tensorboard (Task3)  
+> 注意：  
+> 代码框架 (v1-v6.1) **某些大版本间奖励函数的定义差异较大，没有可比性**  
+
 ``` zsh
 cd projects_mac/own/rl_learn_zq_native/
 conda activate rl_learn
@@ -127,8 +133,11 @@ tensorboard --logdir=Task3_manipulator_bring_ball/outputs/
 ```
 
 ### 实验结果展示 & 录制 (Task3)  
-> 通过 --help 指令获取：**“train 阶段使用的参数“**；**“详细的指令和推荐的范围“**  
-> 如果不能调用 mjpython 可以尝试 python  
+
+> 注意：  
+> 1. 如果不能调用 mjpython 可以尝试 python(非 MacOS 建议先尝试 python 调用)  
+> 2. 建议先通过 --help 指令获取：**“train 阶段使用的参数“**；**“详细的指令和推荐的范围“**  
+> 3. 代码框架 (v1-v6.1) **版本不向前兼容**，如果要 show 之前的实验结果可以通过 git 历史回溯  
 
 ```zsh
 mjpython Task3_manipulator_bring_ball/show.py --help
@@ -170,27 +179,8 @@ rl_learn_zq_native/
 
 > 手写算法核心逻辑参考：上海交通大学 张伟楠 《动手学强化学习》 & https://github.com/boyu-ai/Hands-on-RL    
 
----
-
-**Task2【删除】**：  
-
-```
-rl_learn_zq_native/
-├── Task2_sb3_sop/      # 【Task2】：尝试使用 Stable Baselines3 框架
-```
-
-- 核心目标: 熟悉 SB3  
-- 任务概述：尝试使用 Stable Baselines3 框架, 解决稍微困难些的任务 PandaReach-v3  
-
----
-
-**Task4【TODO】：基于Linkerhand O6 视觉动力学的研究**:  
-
-```
-rl_learn_zq_native/
-├── Task4_mylinker/             # Task4: Linkerhand O6 视觉动力学 [TODO]
-│   └── xml/meshes/             # 初步转化好了 xml，并通过 mujoco 可视化 [TODO: debug]
-```
+**Task2【删除】**：   
+**Task4【删除】**:  
 
 ---
 
@@ -226,16 +216,9 @@ brew install ffmpeg
 for f in *.mov; do ffmpeg -i "$f" -vf "fps=18,scale=-1:600" -sws_flags lanczos -fps_mode cfr -an "${f%.mov}.gif"; done
 ```
 
-
 > WSL/Windows: Install pytorch  
 ```bash
 #  示例：WSL/Windows + RTX 5060Ti (sm_120)：CUDA 12.8 | torch 2.7.0
 # 避免--index-url指令冲突。不在requirements中安装
 pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128
-```
-
-> Task2：需额外安装 pybullet  
-```bash
-# pip 不好装 pybullet，用 conda
-conda install -c conda-forge pybullet
 ```

@@ -1,8 +1,4 @@
-"""
-config.py: 
-    对应任务: 平面机械手抓球——DeepMind Control Suite 中的 Manipulator 经典任务
-    对应 MuJoCo 的模型实例: "manipulator_bring_ball.xml" 
-"""
+"""config.py: """
 import os
 from dataclasses import dataclass, field
 from typing import List, Dict
@@ -10,60 +6,62 @@ from typing import List, Dict
 @dataclass
 class TrainConfig:
     # --- 实验元信息 ---
-    exp_name: str = "v6.1_exp-02_PPO"
+    exp_name: str = "v6.1_exp-03_PPO"
     task_dir: str = os.path.dirname(os.path.abspath(__file__))
     xml_path: str = os.path.join(task_dir, "xml", "manipulator_bring_ball.xml")
     output_dir: str = os.path.join(task_dir, "outputs", exp_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Simulation
-    ctrl_dt: float = 0.01  # 根据 real 频率确定
-    sim_dt: float = 0.002  # 控制物理引擎计算进度；先选 sim_substeps 并确保 ctrl_dt/sim_dt 整除 # 用于顶替xml中的频率
-    sim_substeps: int = 5 # ctrl_dt/sim_dt 必须整除
-    episode_max_time: float = 10.0 # 单个 episode 最长时间
-    episode_max_steps: int = 1000   # 单个 episode 最大步数（env.py）# episode_max_time / ctrl_dt
+    # --- Simulation, 物理仿真控制（env.py） ---
+    ctrl_dt: float = 0.01  # 控制器时间步 (依据真实控制频率设定)
+    sim_dt: float = 0.002  # 物理引擎时间步 (覆盖 XML 设置)
+    sim_substeps: int = 5  # 子步数，需确保 ctrl_dt / sim_dt 整除
+    episode_max_time: float = 10.0  # 单个 Episode 的最大物理时间 (秒)
+    episode_max_steps: int = 1000   # 单个 episode 最大步数; = episode_max_time / ctrl_dt
 
-    # --- DRL 相关参数 --- 
-    # 启动 CPU 并行运算
-    n_envs = 16  # WSL CPU；使用并行环境数量
-
-    # 神经网络参数更新和总训练步数
-    n_steps: int = 2048   # train.py, n_steps * n_envs 后进行一次梯度回传更新参数
-    eval_freq_steps: int = (2048) * 5  # train.py，(n_steps) * 5；不要 * n_envs！；每 5 个 rollout 评估一次
-    total_timesteps: int = (2048 * 16) * 15  # train.py，learn，total_timesteps后评估一次课程训练效果，判断是否进入下一课程或终止
+    # --- DRL 系统参数 --- 
+    # 每次收集完 n_steps * n_envs 条 experience 后进行梯度回传
+    n_envs = 16  # CPU 并行环境数量
+    n_steps: int = 2048   # 单个环境采集 experience 数量
+    # 评估频率：每 5 个完整 rollout 进行一次模型评估
+    eval_freq_steps: int = (2048) * 5  # 注：eval_freq 监控的是单环境调用 env.step() 的次数！故无需 * n_envs
+    # 课程学习：total_timesteps后评估一次课程训练效果，判断是否进入下一课程或终止
+    total_timesteps: int = (2048 * 16) * 15  # train.py，learn，
 
     # PPO 超参
-    batch_size: int = 512   # 16 个环境并行。一次梯度更新拥有 n_steps * n_envs条数据。 512 依然属于中等偏小的尺寸，非常安全，不容易引起过拟合。
-                            # 且较大的 batch size 抵消数据的特殊性（比如刚好这几次都摔倒了），让学习曲线更平滑。
-    learning_rate: float = 3e-4
-    gamma: float = 0.99
+    batch_size: int = 512   # 太大过拟合；太小无法抵消数据的特殊性，梯度不稳定；512：(2048 * 16) 适中
+    learning_rate: float = 3e-4  # Actor-Critic 网络的初始学习率
+    gamma: float = 0.99  # 折扣因子 (Discount Factor)
 
-    # --- reward 相关参数 ---
-    # 阈值
+    # --- 奖励函数配置 (Reward Shaping) ---
+    # 状态阈值
     pause_grasp2b_threshold: float = 0.200  
     touch_sensor_threshold: float = 0.01
     lift_height_threshold: float = 0.040  
     pause_b2t_threshold: float = 0.200     
     success_dist_threshold: float = 0.010
 
-    # 奖励权重
-    reach_weight: float = 1.0    # 1.0
-    orient_weight: float = 1.5   # 1.5
-    pause_weight: float = 0.5    # 0.5
-    close_weight: float = 3.0    # 3.0
-    lift_reward_weight: float = 1.0  # 1.0
+    # Phase 1: 抓取过程奖励权重
+    reach_weight: float = 1.0        # 接近物体
+    orient_weight: float = 1.5       # 姿态对齐
+    pause_weight: float = 0.5        # 抓取前稳定停顿
+    close_weight: float = 3.0        # 闭合抓取
+    lift_reward_weight: float = 1.0  # 抬升物体
 
-    transport_weight: float = 6.0    # 6.0
-    pause2_weight: float = 1.0    # 1.0
-    precision_weight: float = 1.0    # 1.0
+    # Phase 2: 运输与姿态稳定奖励权重
+    transport_weight: float = 6.0    # 向目标点运输
+    pause2_weight: float = 1.0       # 到达目标后的稳定停顿
+    precision_weight: float = 1.0    # 目标点精准度
 
-    transport_progress_scale: float = 2.0    # 2.0
-    hover_penalty_scale: float = 0.00    # 0.00
+    # 势能与惩罚因子
+    transport_progress_scale: float = 2.0  # 基于位移势能的密集奖励缩放
+    hover_penalty_scale: float = 0.00      # 悬停而不抓取的惩罚因子
 
     # discount_post_grasp: float = 0.7  # 建议设置 0.5~0.9
     # reward_success: float = 50.0  # 不能太小避免淹没；不能太大 Critic 网络梯度爆炸；尝试 50-200
 
-    # --- 课程学习配置 ---
+    # --- 课程学习 (Curriculum Learning) ---
+    # 分阶段增加墙体高度，引导策略网络从简单任务逐步适应复杂越障任务。
     curriculum_stages: List[Dict] = field(default_factory=lambda: [
         {"wall_height": 0.00},
         {"wall_height": 0.05},
