@@ -33,3 +33,7 @@ Thumbs.db
 
 # 锁定 .gitattributes 不被忽略
 !.gitattributes
+Task3_manipulator_bring_ball/show_results/*.mov
+Task3_manipulator_bring_ball/show_results/summary_奖励塑性测试.gif
+Task3_manipulator_bring_ball/show_results/summary_成功结果.gif
+Task3_manipulator_bring_ball/show_results/summary.gif
