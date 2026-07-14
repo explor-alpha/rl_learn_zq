@@ -10,9 +10,9 @@
 
 **主要内容**：
 
-1. **理论剖析**：PPO理论剖析；数据流，超参数含义的理解；PPO basic ideas 推理等；
+1. **理论剖析**：[问题建模](Task3_manipulator_bring_ball/keynotes/KeyNotes1_问题建模.webp)；[PPO优化全过程数据流](Task3_manipulator_bring_ball/keynotes/KeyNotes2_数据流.webp)，超参数含义的理解；PPO basic ideas 推理等；
 2. **编程**：核心架构见下图; [复现方案见：Quick Start](#quick-start---task3)；
-3. **实验**：mdp设计和奖励塑性实验。
+3. **实验**：MDP设计和奖励塑性实验。
 - 以下为上述 3 部分对应的图片展示 [高清图片见：KeyNotes](Task3_manipulator_bring_ball/keynotes)
 
 <div align="center">
