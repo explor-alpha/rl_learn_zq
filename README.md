@@ -11,7 +11,7 @@
 **主要内容**：
 
 1. **理论剖析**：PPO理论剖析；数据流，超参数含义的理解；PPO basic ideas 推理等；
-2. **编程**：核心架构见下图; [复现方案见：Quick Start](#quick-start-task3)；
+2. **编程**：核心架构见下图; [复现方案见：Quick Start](#quick-start---task3)；
 3. **实验**：mdp设计和奖励塑性实验。
 - 以下为上述 3 部分对应的图片展示 [高清图片见：KeyNotes](Task3_manipulator_bring_ball/keynotes)
 
@@ -63,7 +63,7 @@ rl_learn_zq_native/
 
 ---
 
-## Quick Start（Task3）
+## Quick Start - Task3
 ### Macbook M5环境配置（**Native**）
 ```zsh
 conda create -n rl_learn python=3.10 -y
