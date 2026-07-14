@@ -6,12 +6,21 @@
 > - 仿真平台/物理引擎：MuJoCo；
 > - 工具库：强化学习标准算法库 Stable Baselines3；
 > - 算法：PPO(Proximal Policy Optimization)；
-> - 原始 xml 模型文件来源：DeepMind Control Suite: Manipulator
+> - 原始 xml 模型文件来源：DeepMind Control Suite: Manipulator 或 [xml](Task3_manipulator_bring_ball/xml/manipulator_bring_ball.xml)
 
 **主要内容**：
 
+1. **理论剖析**：PPO理论剖析；数据流，超参数含义的理解；PPO basic ideas 推理等；
+2. **编程**：核心架构见下图; [复现方案见：Quick Start](#quick-start-task3)；
+3. **实验**：mdp设计和奖励塑性实验。
+- 以下为上述 3 部分对应的图片展示 [高清图片见：KeyNotes](Task3_manipulator_bring_ball/keynotes)
+
 <div align="center">
 <img src="Task3_manipulator_bring_ball/keynotes/KeyNotes_理论剖析.webp" width="100%">
+<p><b></b></p>
+</div>
+<div align="center">
+<img src="Task3_manipulator_bring_ball/keynotes/KeyNotes_项目核心架构.webp" width="100%">
 <p><b></b></p>
 </div>
 <div align="center">
@@ -31,7 +40,7 @@
 
 ```
 rl_learn_zq_native/
-├── Task3_manipulator_bring_ball/          # 【Task3】：从 0 实现 “平面-机械手：操控物体-跨障-送至目标位置”
+├── Task3_manipulator_bring_ball/        、
 │   │
 │   ├── xml/                               
 │   │   ├── manipulator_bring_ball.xml     # 核心：xml 模型文件
